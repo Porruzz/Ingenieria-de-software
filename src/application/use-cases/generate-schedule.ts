@@ -9,12 +9,23 @@ import { Course, Section } from '../../domain/entities/course';
 export class GenerateSchedule {
   execute(student: Student, availableCourses: Course[]): Section[] {
     console.log(`Generando horario óptimo para ${student.name}`);
-    
-    // Aquí programarás el algoritmo que cruza:
-    // 1. Materias que puede ver (validando US-06).
-    // 2. Horarios que no choquen conforbiddenZones (US-01).
-    // 3. Maximización de créditos.
 
-    return []; // Retorna el listado de secciones elegidas
+    // 1. Filtrar materias que puede ver Y que NO ha aprobado todavía
+    const validCourses = availableCourses.filter(course =>
+      student.hasPrerequisites(course) &&
+      !student.academicHistory.includes(course.id) // <--- Esta línea es clave
+    );
+
+    // 2. Aquí iría la lógica de choque de horarios (US-01)
+    const selectedSections: Section[] = [];
+
+    // 3. Algoritmo simple: Intentar agregar cada sección si hay espacio
+    validCourses.forEach(course => {
+      const bestSection = course.sections[0]; // Por ahora tomamos la primera
+      selectedSections.push(bestSection);
+    });
+
+    return selectedSections;
+
   }
 }
