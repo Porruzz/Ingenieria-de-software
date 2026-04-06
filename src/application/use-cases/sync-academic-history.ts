@@ -14,8 +14,8 @@ export class SyncAcademicHistory {
    * @param repository Adapatador de persistencia.
    */
   constructor(
-    private portal: AcademicPortalPort,
-    private repository: AcademicRepositoryPort
+    private readonly portal: AcademicPortalPort,
+    private readonly repository: AcademicRepositoryPort
   ) {}
 
   /**
