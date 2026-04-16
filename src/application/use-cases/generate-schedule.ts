@@ -23,6 +23,7 @@ import { ScheduleEngine } from '../engine/schedule-engine';
 export class GenerateOptimalSchedule {
   private readonly engine: ScheduleEngine;
 
+
   /**
    * Inyección de dependencias mediante puertos (Hexagonal Architecture).
    * @param courseOffering Adaptador para la oferta académica del semestre.

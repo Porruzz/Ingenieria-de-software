@@ -1,147 +1,64 @@
-import { AESEncryptionService } from "./infrastructure/services/aes-encryption.service";
-import { EncryptedAcademicRepository } from "./infrastructure/repositories/academic.repository";
-import { InMemoryPrerequisiteRepository } from "./infrastructure/repositories/prerequisite.repository";
-import { InMemorySwapRepository } from "./infrastructure/repositories/swap.repository";
-import { ValidatePrerequisites } from "./application/use-cases/validate-prerequisites";
-import { ProactiveSwapManager } from "./application/use-cases/proactive-swap-manager";
-import { SwapRequest } from "./domain/entities/swap";
-import { Student } from "./domain/entities/student";
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import { Pool } from 'pg';
+import { CryptoService } from './infrastructure/security/crypto-service';
+import { RedisService } from './infrastructure/cache/redis-service';
+import { PostgresTimeBlockRepository } from './infrastructure/database/postgres-time-block-repository';
+import { PostgresStudentRepository } from './infrastructure/database/postgres-student-repository';
+import { ManageTimeBlocksUseCase } from './application/use-cases/manage-time-blocks';
+import { UpdateStudentLogisticsUseCase } from './application/use-cases/update-student-logistics';
+import { TimeBlockController } from './interfaces/controllers/time-block-controller';
+import { StudentController } from './interfaces/controllers/student-controller';
 
-/**
- * ══════════════════════════════════════════════════════════
- *   Enrollment Optimizer — DEMO SPRINT 1 COMPLETO
- *   "Sincronizamos la vida real con el éxito académico."
- * ══════════════════════════════════════════════════════════
- * 
- * Escenario real: Dos estudiantes con conflictos de horario.
- *   - Estudiante A (Santi): Tiene Cálculo II G1 (7 AM), pero trabaja a esa hora.
- *   - Estudiante B (Juan): Tiene Cálculo II G2 (10 AM), pero prefiere madrugar.
- * 
- * El Smart Match Engine los conecta automáticamente de forma
- * segura, validada y legal.
- * 
- * Historias integradas: US-01, US-02, US-03, US-04, US-05, US-06
- */
-async function bootstrap() {
-  console.log("══════════════════════════════════════════════════════════");
-  console.log("  🏢 SaaS: EL ARQUITECTO DE HORARIOS INTELIGENTE");
-  console.log("  🤝 Propuesta: Sincronizar vida real con éxito académico");
-  console.log("══════════════════════════════════════════════════════════\n");
+dotenv.config();
 
-  // ═══════════════════════════════════════════════════
-  // INFRAESTRUCTURA: Inyección de Dependencias (IoC)
-  // ═══════════════════════════════════════════════════
-  const encryption = new AESEncryptionService();       // US-04
-  const academicRepo = new EncryptedAcademicRepository(encryption); // US-02 + US-04
-  const preRepo = new InMemoryPrerequisiteRepository(); // US-06
-  const swapRepo = new InMemorySwapRepository();        // RF-03
-  const validator = new ValidatePrerequisites(academicRepo, preRepo); // US-06
+const app = express();
 
-  // ═══════════════════════════════════════════════════
-  // PASO 1: Perfiles de Vida (US-01 + US-03)
-  // ═══════════════════════════════════════════════════
-  console.log("─── PASO 1: Perfiles de Vida (US-01 + US-03) ───\n");
+// Middlewares
+app.use(express.json());
+app.use(cors());
+app.use(helmet());
 
-  const students = new Map<string, Student>();
+// Dependency Injection Setup
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  user: process.env.DB_USER || 'enrollment_user',
+  password: process.env.DB_PASSWORD || 'enrollment_pass',
+  database: process.env.DB_NAME || 'enrollment_db',
+});
 
-  const studentA = new Student(
-    "SANTI-01", "Santiago Porras",
-    ["MAT101"],  // Aprobó Cálculo I
-    [{ day: 'Lunes', startTime: '06:00', endTime: '09:00', label: '💻 Trabajo Freelance' }],
-    30  // 30 min de bus
-  );
-  students.set(studentA.id, studentA);
+const cryptoService = new CryptoService(
+  process.env.MASTER_ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+);
 
-  const studentB = new Student(
-    "JUAN-02", "Juan Rivera",
-    ["MAT101"],  // Aprobó Cálculo I
-    [{ day: 'Lunes', startTime: '11:00', endTime: '13:00', label: '⚽ Fútbol' }],
-    45  // 45 min de bus
-  );
-  students.set(studentB.id, studentB);
+const redisService = new RedisService(`redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`);
 
-  console.log(`  👤 ${studentA.name}: Trabaja L/6-9AM, Bus 30min`);
-  console.log(`  👤 ${studentB.name}: Fútbol L/11-1PM, Bus 45min\n`);
+const timeBlockRepo = new PostgresTimeBlockRepository(pool, cryptoService);
+const manageTimeBlocksUseCase = new ManageTimeBlocksUseCase(timeBlockRepo, redisService);
+const timeBlockController = new TimeBlockController(manageTimeBlocksUseCase);
 
-  // ═══════════════════════════════════════════════════
-  // PASO 2: Sincronización Académica Segura (US-02 + US-04)
-  // ═══════════════════════════════════════════════════
-  console.log("─── PASO 2: Sincronización Académica (US-02 + US-04) ───\n");
+const studentRepo = new PostgresStudentRepository(pool);
+const updateStudentLogisticsUseCase = new UpdateStudentLogisticsUseCase(studentRepo, redisService);
+const studentController = new StudentController(updateStudentLogisticsUseCase);
 
-  await academicRepo.saveHistory({
-    studentId: "SANTI-01",
-    records: [{ courseId: 'MAT101', courseName: 'Cálculo I', status: 'APROBADA', grade: '4.0', credits: 4, period: '2025-1' }],
-    totalCredits: 4, currentSemester: 2, lastSync: new Date()
-  });
-  await academicRepo.saveHistory({
-    studentId: "JUAN-02",
-    records: [{ courseId: 'MAT101', courseName: 'Cálculo I', status: 'APROBADA', grade: '4.2', credits: 4, period: '2025-1' }],
-    totalCredits: 4, currentSemester: 2, lastSync: new Date()
-  });
+// Routes
+const router = express.Router();
 
-  // Demostrar cifrado en reposo (US-04)
-  const encryptedDataA = await academicRepo.debugGetEncryptedData("SANTI-01");
-  console.log(`  🛡️  Dato en BD (cifrado): "${encryptedDataA?.substring(0, 50)}..."`);
-  console.log(`  🛡️  ¿Es legible? ${(() => { try { JSON.parse(encryptedDataA || ''); return 'SÍ ❌'; } catch { return 'NO ✅ (correcto, está cifrado)'; } })()}\n`);
+router.post('/students/:studentId/time-blocks', (req, res) => timeBlockController.createBlock(req, res));
+router.get('/students/:studentId/time-blocks', (req, res) => timeBlockController.getBlocks(req, res));
+router.put('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockController.updateBlock(req, res));
+router.delete('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockController.deleteBlock(req, res));
 
-  // ═══════════════════════════════════════════════════
-  // PASO 3: Validación de Prerrequisitos (US-06)
-  // ═══════════════════════════════════════════════════
-  console.log("─── PASO 3: Validación de Prerrequisitos (US-06) ───\n");
+router.put('/students/:studentId/logistics', (req, res) => studentController.updateLogistics(req, res));
 
-  const v1 = await validator.execute("SANTI-01", 'MAT102');
-  const v2 = await validator.execute("SANTI-01", 'MAT201');
-  console.log(`  ${v1.status === 'APROBADO' ? '🟢' : '🔴'} ${v1.message}`);
-  console.log(`  ${v2.status === 'APROBADO' ? '🟢' : '🔴'} ${v2.message}\n`);
+app.use('/api', router);
 
-  // ═══════════════════════════════════════════════════
-  // PASO 4: Smart Match — El Marketplace de Cupos (RF-03)
-  // ═══════════════════════════════════════════════════
-  console.log("─── PASO 4: Smart Match — Marketplace de Cupos (RF-03) ───\n");
+const PORT = process.env.PORT || 3000;
 
-  const swapManager = new ProactiveSwapManager(validator, swapRepo, students);
+app.listen(PORT, () => {
+  console.log(`[Server] Corriendo en puerto ${PORT}`);
+});
 
-  // Santi: tiene G1 (7AM, choca con trabajo) → quiere G2 (10AM)
-  const requestA: SwapRequest = {
-    id: "SR-001", studentId: "SANTI-01",
-    offeredSectionId: "SEC-MAT102-A",
-    desiredSectionIds: ["SEC-MAT102-B"],
-    currentSatisfactionScore: 40,
-    status: 'PENDIENTE', createdAt: new Date()
-  };
-
-  // Juan: tiene G2 (10AM, choca con fútbol a las 11) → quiere G1 (7AM)
-  const requestB: SwapRequest = {
-    id: "SR-002", studentId: "JUAN-02",
-    offeredSectionId: "SEC-MAT102-B",
-    desiredSectionIds: ["SEC-MAT102-A"],
-    currentSatisfactionScore: 55,
-    status: 'PENDIENTE', createdAt: new Date()
-  };
-
-  await swapManager.submitSwapRequest(requestA);
-  await swapManager.submitSwapRequest(requestB);
-
-  // ¡EL MATCH PROACTIVO!
-  const matches = await swapManager.runSmartMatch();
-
-  console.log("\n══════════════════════════════════════════════════════════");
-  console.log("  🚀 RESULTADO DEL SMART MATCH ENGINE");
-  console.log("══════════════════════════════════════════════════════════\n");
-
-  for (const match of matches) {
-    console.log(`  🤝 ¡MATCH ENCONTRADO!`);
-    console.log(`  👤 ${match.studentA.id} → Entrega ${match.studentA.delivers}, Recibe ${match.studentA.receives}`);
-    console.log(`  👤 ${match.studentB.id} → Entrega ${match.studentB.delivers}, Recibe ${match.studentB.receives}`);
-    console.log(`  📈 Mejora de Satisfacción: A +${match.improvementA}%, B +${match.improvementB}%`);
-    console.log(`  🛡️  Hash de Seguridad: ${match.systemSafetyHash}`);
-    console.log(`  ✅ Intercambio Avalado, Legal y Seguro (US-04 + US-06)\n`);
-  }
-
-  console.log("══════════════════════════════════════════════════════════");
-  console.log("  🎉 SPRINT 1 COMPLETADO — Todas las US integradas");
-  console.log("  US-01 ✅ | US-02 ✅ | US-03 ✅ | US-04 ✅ | US-05 ✅ | US-06 ✅");
-  console.log("══════════════════════════════════════════════════════════");
-}
-
-bootstrap().catch(console.error);
