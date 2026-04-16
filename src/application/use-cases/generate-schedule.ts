@@ -8,8 +8,8 @@ import { Course, Section } from '../../domain/entities/course';
  */
 export class GenerateSchedule {
   execute(student: Student, availableCourses: Course[]): Section[] {
-    console.log(`Generando horario óptimo para ${student.name}`);
-    
+    console.log(`Generando horario óptimo para ${student.nombreCompleto}`);
+
     // Aquí programarás el algoritmo que cruza:
     // 1. Materias que puede ver (validando US-06).
     // 2. Horarios que no choquen conforbiddenZones (US-01).
