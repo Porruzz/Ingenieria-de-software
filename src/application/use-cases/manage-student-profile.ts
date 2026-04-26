@@ -1,4 +1,4 @@
-import { ForbiddenZone, Student } from '../../domain/entities/student';
+import { Student } from '../../domain/entities/student';
 import { StudentProfilePort } from '../ports/student-profile.port';
 
 /**
@@ -16,17 +16,18 @@ export class ManageStudentProfile {
    * @param studentId ID del estudiante.
    * @param zones Lista de bloques de tiempo restringidos.
    */
-  async setForbiddenZones(studentId: string, zones: ForbiddenZone[]): Promise<void> {
+  async setForbiddenZones(studentId: string, zones: any[]): Promise<void> {
     // Validación de negocio proactiva:
     for (const zone of zones) {
       if (this.toMinutes(zone.startTime) >= this.toMinutes(zone.endTime)) {
-        throw new Error(`[US-01] Error en bloque (${zone.label}): La hora de fin debe ser mayor a la de inicio.`);
+        throw new Error(`[US-01] Error en bloque (${zone.label || zone.description}): La hora de fin debe ser mayor a la de inicio.`);
       }
     }
     
     console.log(`[US-01] Guardando ${zones.length} zonas prohibidas para: ${studentId}`);
-    return this.profileRepository.updateForbiddenZones(studentId, zones);
+    return this.profileRepository.updateTimeBlocks(studentId, zones);
   }
+
 
   /**
    * Define cuánto tarda el estudiante en llegar a la U (US-03).

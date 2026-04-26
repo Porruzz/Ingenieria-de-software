@@ -21,8 +21,8 @@ describe('US-01 & US-03: Gestión de Perfil de Vida', () => {
       await profileManager.setForbiddenZones(studentId, zones);
       
       const profile = await repository.getStudentProfile(studentId);
-      expect(profile?.forbiddenZones).toHaveLength(1);
-      expect(profile?.forbiddenZones[0].label).toBe('Trabajo');
+      expect(profile?.prohibitedTimeBlocks).toHaveLength(1);
+      expect(profile?.prohibitedTimeBlocks[0].description).toBe('Trabajo');
     });
 
     it('debería fallar si la hora de fin es menor a la de inicio', async () => {
@@ -40,8 +40,9 @@ describe('US-01 & US-03: Gestión de Perfil de Vida', () => {
       await profileManager.setCommuteTime(studentId, 45);
       
       const profile = await repository.getStudentProfile(studentId);
-      expect(profile?.commuteTimeMinutes).toBe(45);
+      expect(profile?.tiempoTrasladoMin).toBe(45);
     });
+
 
     it('debería rechazar tiempos de desplazamiento irreales (p.ej. negativos o > 4hrs)', async () => {
       await expect(profileManager.setCommuteTime(studentId, -10))

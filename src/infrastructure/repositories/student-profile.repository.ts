@@ -1,68 +1,81 @@
-import { ForbiddenZone, Student } from '../../domain/entities/student';
+import { Student } from '../../domain/entities/student';
+import { ProhibitedTimeBlock } from '../../domain/entities/prohibited-time-block';
 import { StudentProfilePort } from '../../application/ports/student-profile.port';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * US-01 y US-03: Repositorio en memoria del perfil del estudiante.
  * Almacena las preferencias de vida y logística.
- * 
- * En producción, esto interactuaría con la tabla `student` en PostgreSQL.
- * Campos mapeados:
- *   - forbidden_zones (como JSONB)
- *   - commute_time_minutes
- *   - personal_data (cifrados bajo la US-04 en el repositorio académico)
  */
 export class InMemoryStudentProfileRepository implements StudentProfilePort {
   private readonly students: Map<string, Student> = new Map();
 
-  /**
-   * Crea un perfil inicial para el estudiante.
-   * Usado en el onboarding (US-02).
-   */
   async createInitialProfile(id: string, name: string): Promise<void> {
-    const student = new Student(id, name, [], [], 0);
+    const student = new Student({
+        id,
+        nombreCompleto: name,
+        academicHistory: [],
+        prohibitedTimeBlocks: [],
+        tiempoTrasladoMin: 0,
+        bufferSeguridadMin: 15,
+        identificacionUniversidad: '',
+        emailInstitucional: '',
+        creditosAprobados: 0,
+        promedioAcumulado: 0,
+        trabaja: false,
+        horasTrabajoSemanal: 0
+    });
     this.students.set(id, student);
   }
 
-  /**
-   * Actualiza las zonas de trabajo/bienestar (US-01).
-   * @throws Error si el estudiante no existe (debe hacer onboarding primero).
-   */
-  async updateForbiddenZones(studentId: string, zones: ForbiddenZone[]): Promise<void> {
+  async updateTimeBlocks(studentId: string, blocks: any[]): Promise<void> {
     const student = this.students.get(studentId);
     if (!student) {
-      throw new Error(`[US-01] Estudiante ${studentId} no encontrado. Debe completar el onboarding primero.`);
+      throw new Error(`[US-01] Estudiante ${studentId} no encontrado.`);
     }
-    this.students.set(studentId, new Student(
-      student.id,
-      student.name,
-      student.academicHistory,
-      zones,
-      student.commuteTimeMinutes
-    ));
+
+    const prohibitedTimeBlocks = blocks.map(b => new ProhibitedTimeBlock({
+        id: uuidv4(),
+        studentId,
+        dayOfWeek: b.day || b.dayOfWeek,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        type: 'OTRO',
+        isRecurring: true,
+        recurrenceStartDate: null,
+        recurrenceEndDate: null,
+        description: b.label || b.description
+    }));
+
+    const updatedStudent = new Student({
+        ...this.toProps(student),
+        prohibitedTimeBlocks
+    });
+
+    this.students.set(studentId, updatedStudent);
   }
 
-  /**
-   * Actualiza el tiempo de transporte (US-03).
-   * @throws Error si el estudiante no existe (debe hacer onboarding primero).
-   */
   async updateCommuteTime(studentId: string, minutes: number): Promise<void> {
     const student = this.students.get(studentId);
     if (!student) {
-      throw new Error(`[US-03] Estudiante ${studentId} no encontrado. Debe completar el onboarding primero.`);
+      throw new Error(`[US-03] Estudiante ${studentId} no encontrado.`);
     }
-    this.students.set(studentId, new Student(
-      student.id,
-      student.name,
-      student.academicHistory,
-      student.forbiddenZones,
-      minutes
-    ));
+
+    const updatedStudent = new Student({
+        ...this.toProps(student),
+        tiempoTrasladoMin: minutes
+    });
+
+    this.students.set(studentId, updatedStudent);
   }
 
-  /**
-   * Recupera el perfil completo del estudiante.
-   */
   async getStudentProfile(studentId: string): Promise<Student | null> {
     return this.students.get(studentId) || null;
   }
+
+  // Helper para convertir entidad a props (ya que en la entidad son privadas)
+  private toProps(student: any): any {
+    return { ...student.props };
+  }
 }
+

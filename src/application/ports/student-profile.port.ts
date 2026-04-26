@@ -1,4 +1,4 @@
-import { ForbiddenZone, Student } from '../../domain/entities/student';
+import { Student } from '../../domain/entities/student';
 
 /**
  * US-01 y US-03: Puerto para gestionar el perfil personal del estudiante.
@@ -6,9 +6,9 @@ import { ForbiddenZone, Student } from '../../domain/entities/student';
  */
 export interface StudentProfilePort {
   /**
-   * Guarda o actualiza las zonas prohibidas del estudiante (US-01).
+   * Guarda o actualiza los bloques de tiempo prohibidos (US-01).
    */
-  updateForbiddenZones(studentId: string, zones: ForbiddenZone[]): Promise<void>;
+  updateTimeBlocks(studentId: string, blocks: any[]): Promise<void>;
 
   /**
    * Actualiza el tiempo de desplazamiento entre campus/casa (US-03).
@@ -20,3 +20,4 @@ export interface StudentProfilePort {
    */
   getStudentProfile(studentId: string): Promise<Student | null>;
 }
+
