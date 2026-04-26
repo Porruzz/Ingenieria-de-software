@@ -1,10 +1,20 @@
 package com.academico.capadatos;
 
+// ============================================================
+//  US-08 | Cupos Disponibles por Sección
+//  Capa: Datos  |  Clase: Seccion
+// ============================================================
+
 /**
- * US-08: Capa de Datos
+ * US-08 — Capa de Datos: Entidad Seccion
+ *
  * Representa una sección de una materia universitaria.
  * Contiene la lógica base para verificar si tiene cupos disponibles,
  * criterio central del filtrado requerido en la historia de usuario US-08.
+ *
+ * Historia de Usuario (US-08):
+ *   "Como estudiante, quiero ver qué secciones de una materia tienen
+ *    cupos disponibles, para evaluar un posible cambio de sección."
  */
 public class Seccion {
 

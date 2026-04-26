@@ -1,5 +1,10 @@
 package com.academico.capalogica;
 
+// ============================================================
+//  US-08 | Cupos Disponibles por Sección
+//  Capa: Lógica  |  Clase: ServicioSecciones
+// ============================================================
+
 import com.academico.capadatos.RepositorioSecciones;
 import com.academico.capadatos.Seccion;
 
@@ -7,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * US-08: Capa Lógica — Servicio de Secciones
+ * US-08 — Capa Lógica: Servicio de Secciones
  *
  * Este servicio implementa el núcleo de la historia de usuario US-08:
  * "Como estudiante, quiero ver qué otras secciones de una misma materia

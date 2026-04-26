@@ -1,13 +1,23 @@
 package com.academico.capadatos;
 
+// ============================================================
+//  US-08 | Cupos Disponibles por Sección
+//  Capa: Datos  |  Clase: RepositorioSecciones
+// ============================================================
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * US-08: Capa de Datos — Repositorio
+ * US-08 — Capa de Datos: Repositorio de Secciones
+ *
  * Simula la fuente de datos (base de datos / API académica) que almacena
  * todas las secciones disponibles en el sistema.
  * En un entorno real, este repositorio consultaría una BD relacional o servicio REST.
+ *
+ * Historia de Usuario (US-08):
+ *   "Como estudiante, quiero ver qué secciones de una materia tienen
+ *    cupos disponibles, para evaluar un posible cambio de sección."
  */
 public class RepositorioSecciones {
 
