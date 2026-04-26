@@ -16,24 +16,24 @@ import java.util.Optional;
 /**
  * US-09 — Repositorio Spring Data JPA para {@link Intercambio}.
  *
- * La consulta JPQL {@code buscarMatchCruzado} detecta el "match cruzado":
+ * La consulta JPQL {@code buscarMatchCruzado} detecta un "match cruzado":
  * busca un intercambio PENDIENTE donde:
  *   - su materiaDeseadaId  == materiaOfrecidaId del solicitante, Y
  *   - su materiaOfrecidaId == materiaDeseadaId  del solicitante.
  *
- * Esto garantiza que ambos estudiantes obtengan exactamente lo que el otro ofrece.
+ * Esto garantiza que ambos estudiantes obtienen exactamente lo que el otro ofrece.
  */
 @Repository
 public interface IntercambioRepository extends JpaRepository<Intercambio, Long> {
 
     /**
-     * US-09 — Busca un intercambio cruzado (match) compatible.
+     * US-09 — Busca un match cruzado compatible con el nuevo intercambio.
      *
      * Lógica: "Yo ofrezco A y deseo B → busco a alguien que ofrezca B y desee A"
      *
-     * @param materiaDeseada  Lo que el solicitante quiere obtener
-     * @param materiaOfrecida Lo que el solicitante pone a disposición
-     * @return Primer {@link Intercambio} PENDIENTE que hace match; vacío si ninguno
+     * @param materiaDeseada  materiaDeseadaId  del solicitante (lo que quiere obtener)
+     * @param materiaOfrecida materiaOfrecidaId del solicitante (lo que pone a disposición)
+     * @return Primer intercambio PENDIENTE compatible; vacío si no existe ninguno
      */
     @Query("SELECT i FROM Intercambio i " +
            "WHERE i.estado = 'PENDIENTE' " +

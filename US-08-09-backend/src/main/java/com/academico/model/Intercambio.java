@@ -13,27 +13,19 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * US-09 — Entidad JPA que representa una solicitud de intercambio de sección
- * entre estudiantes.
+ * US-09 — Entidad JPA que representa una solicitud de intercambio de sección.
  *
- * Un estudiante ofrece su sección en {@code materiaOfrecidaId} y desea
- * obtener una sección en {@code materiaDeseadaId}. El sistema busca
- * automáticamente un "match" cruzado (otro estudiante que ofrezca lo que
- * este desea y desee lo que este ofrece).
- *
- * Estados posibles:
- * <ul>
- *   <li>{@code "PENDIENTE"} — No se encontró match todavía.</li>
- *   <li>{@code "MATCHED"}  — Se encontró un intercambio cruzado exitoso.</li>
- * </ul>
+ * Estados posibles del campo {@code estado}:
+ *   - "PENDIENTE" → No se encontró match todavía.
+ *   - "MATCHED"   → Se encontró un intercambio cruzado exitoso.
  *
  * Tabla en BD: {@code intercambios}
+ * Endpoint relacionado: POST /api/intercambios/registrar
  */
 @Entity
 @Table(name = "intercambios")
 public class Intercambio {
 
-    /** Identificador único autogenerado */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -42,26 +34,21 @@ public class Intercambio {
     @Column(name = "estudiante_id", nullable = false)
     private Long estudianteId;
 
-    /** ID de la materia/sección que el estudiante DESEA obtener */
+    /** ID de la sección/materia que el estudiante DESEA obtener */
     @Column(name = "materia_deseada_id", nullable = false)
     private Long materiaDeseadaId;
 
-    /** ID de la materia/sección que el estudiante OFRECE a cambio */
+    /** ID de la sección/materia que el estudiante OFRECE a cambio */
     @Column(name = "materia_ofrecida_id", nullable = false)
     private Long materiaOfrecidaId;
 
-    /**
-     * Estado actual del intercambio.
-     * Valor inicial: {@code "PENDIENTE"}. Cambia a {@code "MATCHED"} cuando
-     * el sistema encuentra un intercambio cruzado compatible.
-     */
+    /** Estado del intercambio: "PENDIENTE" o "MATCHED" */
     @Column(name = "estado", nullable = false, length = 20)
     private String estado = "PENDIENTE";
 
     // ── Constructor vacío requerido por JPA ──────────────────────────────────
     public Intercambio() {}
 
-    /** Constructor completo (útil en pruebas y en el servicio) */
     public Intercambio(Long estudianteId, Long materiaDeseadaId, Long materiaOfrecidaId) {
         this.estudianteId = estudianteId;
         this.materiaDeseadaId = materiaDeseadaId;

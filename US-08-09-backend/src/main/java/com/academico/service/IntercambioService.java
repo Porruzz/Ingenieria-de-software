@@ -17,15 +17,13 @@ import java.util.Optional;
  *
  * Historia de Usuario (US-09):
  *   "Como estudiante, quiero registrar un deseo de intercambio de sección y
- *    que el sistema me empare automáticamente con otro estudiante compatible."
+ *    que el sistema me empareje automáticamente con otro estudiante compatible."
  *
  * Algoritmo de matching:
- * <ol>
- *   <li>Se recibe un nuevo intercambio (deseada=B, ofrecida=A).</li>
- *   <li>Se busca en BD un intercambio PENDIENTE con (deseada=A, ofrecida=B).</li>
- *   <li>Si existe match: ambos registros pasan a estado "MATCHED" y se persisten.</li>
- *   <li>Si no existe: el nuevo intercambio se guarda como "PENDIENTE".</li>
- * </ol>
+ *   1. Se recibe nuevo intercambio (deseada=B, ofrecida=A).
+ *   2. Se busca en BD un intercambio PENDIENTE con (deseada=A, ofrecida=B).
+ *   3. Si hay match → ambos pasan a "MATCHED" (transacción atómica).
+ *   4. Si no hay match → se guarda como "PENDIENTE".
  */
 @Service
 public class IntercambioService {
@@ -37,40 +35,35 @@ public class IntercambioService {
     }
 
     /**
-     * US-09 — Registra un intercambio y ejecuta la lógica de matching.
+     * Registra un intercambio y ejecuta la lógica de matching.
      *
-     * La anotación {@link Transactional} garantiza que la actualización de
-     * ambos registros (el match y el nuevo) sea atómica: si falla cualquier
-     * operación, se revierte todo.
+     * @Transactional garantiza que la actualización de ambos registros
+     * (match existente + nuevo) sea atómica.
      *
-     * @param nuevoIntercambio Intercambio a registrar (estado inicial: PENDIENTE)
+     * @param nuevoIntercambio Datos del intercambio a registrar
      * @return El intercambio guardado, con estado "PENDIENTE" o "MATCHED"
      */
     @Transactional
     public Intercambio registrarIntercambio(Intercambio nuevoIntercambio) {
 
-        // Asegurar estado inicial correcto
+        // Garantizar estado inicial correcto independientemente del body enviado
         nuevoIntercambio.setEstado("PENDIENTE");
 
-        // Buscar un intercambio cruzado compatible en la base de datos
+        // Buscar match cruzado en BD
         Optional<Intercambio> matchOpt = intercambioRepository.buscarMatchCruzado(
                 nuevoIntercambio.getMateriaDeseadaId(),
                 nuevoIntercambio.getMateriaOfrecidaId()
         );
 
         if (matchOpt.isPresent()) {
-            // ── MATCH ENCONTRADO ──────────────────────────────────────────────
+            // MATCH ENCONTRADO: actualizar el intercambio existente a MATCHED
             Intercambio match = matchOpt.get();
-
-            // Actualizar ambos intercambios a "MATCHED"
             match.setEstado("MATCHED");
             nuevoIntercambio.setEstado("MATCHED");
-
-            // Persistir el intercambio ya existente con el nuevo estado
             intercambioRepository.save(match);
         }
 
-        // Persistir el nuevo intercambio (MATCHED o PENDIENTE)
+        // Guardar el nuevo intercambio (MATCHED o PENDIENTE)
         return intercambioRepository.save(nuevoIntercambio);
     }
 }
