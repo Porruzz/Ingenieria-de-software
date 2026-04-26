@@ -11,6 +11,18 @@ import { ManageTimeBlocksUseCase } from './application/use-cases/manage-time-blo
 import { UpdateStudentLogisticsUseCase } from './application/use-cases/update-student-logistics';
 import { TimeBlockController } from './interfaces/controllers/time-block-controller';
 import { StudentController } from './interfaces/controllers/student-controller';
+import { CriticalSubjectController } from './interfaces/controllers/critical-subject-controller';
+import { MarketplaceController } from './interfaces/controllers/marketplace-controller';
+import { CalculateCriticalityUseCase } from './application/use-cases/calculate-criticality.use-case';
+import { PublishOfferUseCase } from './application/use-cases/publish-offer.use-case';
+import { RegisterInterestUseCase } from './application/use-cases/register-interest.use-case';
+import { ValidatePrerequisites } from './application/use-cases/validate-prerequisites';
+import { InMemoryCriticalSubjectRepository } from './infrastructure/repositories/in-memory-critical-subject.repository';
+import { InMemoryMarketplaceRepository } from './infrastructure/repositories/in-memory-marketplace.repository';
+import { InMemoryEnrollmentSystemAdapter } from './infrastructure/adapters/in-memory-enrollment-system.adapter';
+import { ConsoleNotificationService } from './infrastructure/services/console-notification.service';
+import { InMemoryPrerequisiteRepository } from './infrastructure/repositories/prerequisite.repository';
+import { EncryptedAcademicRepository } from './infrastructure/repositories/academic.repository';
 
 dotenv.config();
 
@@ -44,6 +56,33 @@ const studentRepo = new PostgresStudentRepository(pool);
 const updateStudentLogisticsUseCase = new UpdateStudentLogisticsUseCase(studentRepo, redisService);
 const studentController = new StudentController(updateStudentLogisticsUseCase);
 
+// US-07 & US-12 Shared dependencies
+const prereqRepo = new InMemoryPrerequisiteRepository();
+const academicRepo = new EncryptedAcademicRepository(cryptoService);
+const validatePrerequisitesUseCase = new ValidatePrerequisites(academicRepo, prereqRepo);
+
+// US-07 Setup
+const criticalSubjectRepo = new InMemoryCriticalSubjectRepository();
+const calculateCriticalityUseCase = new CalculateCriticalityUseCase(criticalSubjectRepo, prereqRepo);
+const criticalSubjectController = new CriticalSubjectController(calculateCriticalityUseCase);
+
+// US-12 Setup
+const marketplaceRepo = new InMemoryMarketplaceRepository();
+const enrollmentSystem = new InMemoryEnrollmentSystemAdapter();
+const notificationService = new ConsoleNotificationService();
+const publishOfferUseCase = new PublishOfferUseCase(enrollmentSystem, marketplaceRepo);
+const registerInterestUseCase = new RegisterInterestUseCase(
+  marketplaceRepo,
+  enrollmentSystem,
+  notificationService,
+  validatePrerequisitesUseCase
+);
+const marketplaceController = new MarketplaceController(
+  publishOfferUseCase,
+  registerInterestUseCase,
+  marketplaceRepo
+);
+
 // Routes
 const router = express.Router();
 
@@ -53,6 +92,14 @@ router.put('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockC
 router.delete('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockController.deleteBlock(req, res));
 
 router.put('/students/:studentId/logistics', (req, res) => studentController.updateLogistics(req, res));
+
+// US-07 Routes
+router.get('/students/:studentId/criticality', (req, res) => criticalSubjectController.getCriticality(req, res));
+
+// US-12 Routes
+router.post('/marketplace/offers', (req, res) => marketplaceController.publish(req, res));
+router.get('/marketplace/courses/:courseId/offers', (req, res) => marketplaceController.getOffersByCourse(req, res));
+router.post('/marketplace/offers/:offerId/interests', (req, res) => marketplaceController.interest(req, res));
 
 app.use('/api', router);
 

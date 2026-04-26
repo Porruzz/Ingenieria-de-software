@@ -1,12 +1,7 @@
 import crypto from 'crypto';
+import { EncryptionServicePort } from '../../application/ports/encryption-service.port';
 
-export interface EncryptedData {
-  encryptedValue: string;
-  iv: string;
-  authTag: string;
-}
-
-export class CryptoService {
+export class CryptoService implements EncryptionServicePort {
   private readonly algorithm = 'aes-256-gcm';
   private readonly key: Buffer;
 
@@ -17,32 +12,36 @@ export class CryptoService {
     this.key = Buffer.from(masterKeyHex, 'hex');
   }
 
-  encrypt(plainText: string): EncryptedData {
-    const iv = crypto.randomBytes(12); // Standard for GCM
+  /**
+   * Cifra un texto y devuelve una cadena en formato iv:tag:contenido.
+   */
+  encrypt(plainText: string): string {
+    const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
     
     let encrypted = cipher.update(plainText, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
-    const authTag = cipher.getAuthTag();
+    const authTag = cipher.getAuthTag().toString('hex');
 
-    return {
-      encryptedValue: encrypted,
-      iv: iv.toString('hex'),
-      authTag: authTag.toString('hex')
-    };
+    return `${iv.toString('hex')}:${authTag}:${encrypted}`;
   }
 
-  decrypt(encryptedData: EncryptedData): string {
+  /**
+   * Descifra una cadena en formato iv:tag:contenido.
+   */
+  decrypt(combined: string): string {
+    const [ivHex, authTagHex, encryptedValue] = combined.split(':');
+    
     const decipher = crypto.createDecipheriv(
       this.algorithm,
       this.key,
-      Buffer.from(encryptedData.iv, 'hex')
+      Buffer.from(ivHex, 'hex')
     );
     
-    decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
+    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
     
-    let decrypted = decipher.update(encryptedData.encryptedValue, 'hex', 'utf8');
+    let decrypted = decipher.update(encryptedValue, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     
     return decrypted;

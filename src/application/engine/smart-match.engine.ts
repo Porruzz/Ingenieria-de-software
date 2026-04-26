@@ -101,7 +101,7 @@ export class SmartMatchEngine {
     // Cálculo: margen de mejora * factor de necesidad
     // Un estudiante con score bajo (30%) tiene más margen que uno con score alto (80%)
     const improvementMargin = Math.max(0, 100 - baseScore);
-    const needFactor = student.forbiddenZones.length > 0 ? 0.20 : 0.10;
+    const needFactor = student.prohibitedTimeBlocks.length > 0 ? 0.20 : 0.10;
 
     return improvementMargin * needFactor;
   }

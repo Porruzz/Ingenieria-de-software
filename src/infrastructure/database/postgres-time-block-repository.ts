@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { ITimeBlockRepository } from '../../domain/repositories/time-block-repository';
 import { ProhibitedTimeBlock } from '../../domain/entities/prohibited-time-block';
-import { CryptoService, EncryptedData } from '../security/crypto-service';
+import { CryptoService } from '../security/crypto-service';
 
 export class PostgresTimeBlockRepository implements ITimeBlockRepository {
   constructor(
@@ -10,10 +10,9 @@ export class PostgresTimeBlockRepository implements ITimeBlockRepository {
   ) {}
 
   async save(timeBlock: ProhibitedTimeBlock): Promise<void> {
-    // Almacenamos el inicio y fin combinados en un solo cifrado para respetar 
-    // el diseño de DB que tiene una sola columna de iv y auth_tag
     const combinedTimes = `${timeBlock.startTime}|${timeBlock.endTime}`;
-    const encryptedData = this.cryptoService.encrypt(combinedTimes);
+    const encryptedString = this.cryptoService.encrypt(combinedTimes);
+    const [iv, authTag, encryptedValue] = encryptedString.split(':');
 
     const query = `
       INSERT INTO bloque_tiempo_prohibido (
@@ -40,10 +39,10 @@ export class PostgresTimeBlockRepository implements ITimeBlockRepository {
       timeBlock.id,
       timeBlock.studentId,
       timeBlock.dayOfWeek,
-      encryptedData.encryptedValue, // start time field
-      '[COMBINED_ABOVE]',           // end time field (placeholder)
-      encryptedData.iv,
-      encryptedData.authTag,
+      encryptedValue, 
+      '[COMBINED_ABOVE]', 
+      iv,
+      authTag,
       timeBlock.type,
       timeBlock.isRecurring,
       timeBlock.recurrenceStartDate,
@@ -73,13 +72,9 @@ export class PostgresTimeBlockRepository implements ITimeBlockRepository {
   }
 
   private mapToDomain(row: any): ProhibitedTimeBlock {
-    const encryptedData: EncryptedData = {
-      encryptedValue: row.hora_inicio, // En hora_inicio guardamos el combinado
-      iv: row.iv,
-      authTag: row.auth_tag
-    };
-
-    const decryptedCombined = this.cryptoService.decrypt(encryptedData);
+    // Reconstruir el string cifrado iv:tag:valor
+    const combinedEncrypted = `${row.iv}:${row.auth_tag}:${row.hora_inicio}`;
+    const decryptedCombined = this.cryptoService.decrypt(combinedEncrypted);
     const [startTime, endTime] = decryptedCombined.split('|');
 
     return new ProhibitedTimeBlock({
