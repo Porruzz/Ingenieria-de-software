@@ -70,7 +70,8 @@ export class ScheduleEngine {
       pinnedSections,
       input.forbiddenZones,
       input.commuteTimeMinutes,
-      maxCredits
+      maxCredits,
+      input.criticalCourseIds || []
     );
 
     // ─── PASO 5: Calcular puntaje de cada combinación ───
@@ -178,7 +179,8 @@ export class ScheduleEngine {
     pinnedSections: ScheduleItem[],
     forbiddenZones: TimeBlock[],
     commuteTimeMinutes: number,
-    maxCredits: number
+    maxCredits: number,
+    criticalCourseIds: string[]
   ): ScheduleItem[][] {
     const results: ScheduleItem[][] = [];
     const pinnedCredits = pinnedSections.reduce((sum, item) => sum + item.section.credits, 0);
@@ -215,7 +217,10 @@ export class ScheduleEngine {
           ];
 
           if (this.hasTimeConflict(section, allCurrentSections)) continue;
-          if (this.violatesForbiddenZones(section, forbiddenZones)) continue;
+          
+          // RF-07.5: Si es materia crítica, sobreescribe las zonas de bienestar
+          const isCritical = criticalCourseIds.includes(section.courseId);
+          if (!isCritical && this.violatesForbiddenZones(section, forbiddenZones)) continue;
 
           // Si pasa las validaciones, agregar y seguir explorando
           currentItems.push({ section, isPinned: false });

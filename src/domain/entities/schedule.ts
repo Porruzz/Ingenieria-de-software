@@ -61,6 +61,7 @@ export interface ScheduleGenerationInput {
   studentId: string;
   approvedCourseIds: string[];       // Materias ya aprobadas
   failedCourseIds: string[];         // Materias perdidas (priorizar en repitencia)
+  criticalCourseIds?: string[];      // US-07: Materias con IC >= 0.8 que sobreescriben zonas de bienestar
   forbiddenZones: TimeBlock[];       // Zonas prohibidas del estudiante (US-01)
   commuteTimeMinutes: number;        // Tiempo de desplazamiento (US-03)
   pinnedSectionIds: string[];        // Secciones ancladas por el estudiante (RF-05.5)
