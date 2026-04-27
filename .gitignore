@@ -13,4 +13,5 @@ yarn-error.log*
 
 # Java — clases compiladas (no se versiona el bytecode, solo los fuentes)
 out/
+target/
 *.class
