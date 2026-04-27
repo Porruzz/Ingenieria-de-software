@@ -40,10 +40,25 @@ export class InMemorySwapRepository implements SwapRepositoryPort {
   }
 
   async saveMatch(match: SwapMatch): Promise<void> {
-    this.matches.push(match);
+    this.matches.push({ ...match });
+  }
+
+  async getMatchById(matchId: string): Promise<SwapMatch | null> {
+    const match = this.matches.find(m => m.matchId === matchId);
+    return match ? { ...match } : null;
+  }
+
+  async updateMatch(match: SwapMatch): Promise<void> {
+    const index = this.matches.findIndex(m => m.matchId === match.matchId);
+    if (index !== -1) {
+      this.matches[index] = { ...match };
+    } else {
+      throw new Error(`[SwapRepo] Match ${match.matchId} no encontrado para actualizar.`);
+    }
   }
 
   async updateRequestStatus(requestId: string, status: 'MATCHED' | 'COMPLETADO'): Promise<void> {
+
     const request = this.requests.get(requestId);
     if (!request) {
       throw new Error(`[SwapRepo] Solicitud ${requestId} no encontrada.`);

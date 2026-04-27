@@ -32,7 +32,9 @@ describe('US-12 — Marketplace Académico Validado (Publicación y Búsqueda Pr
       validateActiveEnrollment: jest.fn(),
       getEnrollmentByCourse: jest.fn(),
       getEnrollmentById: jest.fn(),
+      registerOfficialSwap: jest.fn(),
     };
+
 
     notificationService = {
       notifyStudent: jest.fn(),
