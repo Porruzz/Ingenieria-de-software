@@ -10,3 +10,7 @@ yarn-error.log*
 .vscode/
 *.swp
 *.swo
+
+# Java — clases compiladas (no se versiona el bytecode, solo los fuentes)
+out/
+*.class
