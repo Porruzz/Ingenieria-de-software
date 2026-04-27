@@ -14,19 +14,28 @@ export interface SwapRequest {
 
 /**
  * Resultado de un Match exitoso entre dos estudiantes.
+ * US-10: Requiere confirmación bilateral antes de ejecutarse.
+ * US-11: Requiere un estado de formalización legal.
  */
 export interface SwapMatch {
+  matchId: string;
   studentA: {
     id: string;
     delivers: string; // Entrega sección X
     receives: string; // Recibe sección Y
+    confirmed: boolean; // US-10
   };
   studentB: {
     id: string;
     delivers: string; // Entrega sección Y
     receives: string; // Recibe sección X
+    confirmed: boolean; // US-10
   };
-  improvementA: number; // Cuánto mejoró el score de A
-  improvementB: number; // Cuánto mejoró el score de B
+  status: 'PENDIENTE_CONFIRMACION' | 'APROBADO' | 'RECHAZADO' | 'FORMALIZADO'; // US-10 & US-11
+  improvementA: number;
+  improvementB: number;
   systemSafetyHash: string; // Hash para validar que es un cambio legal (US-04)
+  formalizationToken?: string; // US-11: Sello digital de la universidad
+  createdAt: Date;
 }
+

@@ -16,7 +16,33 @@ export class InMemoryEnrollmentSystemAdapter implements EnrollmentSystemPort {
     return this.enrollments.find(e => e.enrollmentId === enrollmentId) || null;
   }
 
+  async registerOfficialSwap(
+    studentAId: string,
+    enrollmentAId: string,
+    studentBId: string,
+    enrollmentBId: string
+  ): Promise<{ success: boolean; transactionId: string }> {
+    const enrA = this.enrollments.find(e => e.enrollmentId === enrollmentAId && e.studentId === studentAId);
+    const enrB = this.enrollments.find(e => e.enrollmentId === enrollmentBId && e.studentId === studentBId);
+
+    if (!enrA || !enrB) {
+      throw new Error('No se pudo formalizar: Una de las inscripciones no es válida o no pertenece al estudiante.');
+    }
+
+    // Intercambio de secciones (Simulación de actualización en DB universitaria)
+    const tempSection = enrA.sectionId;
+    enrA.sectionId = enrB.sectionId;
+    enrB.sectionId = tempSection;
+
+    const transactionId = `TX-OFFICIAL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    console.log(`[US-11] Intercambio formalizado en Sistema Universitario. ID Transacción: ${transactionId}`);
+    
+    return { success: true, transactionId };
+  }
+
   addEnrollment(enrollment: OfficialEnrollment) {
     this.enrollments.push(enrollment);
   }
 }
+

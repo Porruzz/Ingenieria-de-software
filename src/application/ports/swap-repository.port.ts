@@ -35,4 +35,15 @@ export interface SwapRepositoryPort {
    * Necesario para la validación de prerrequisitos (US-06).
    */
   getCourseIdFromSection(sectionId: string): Promise<string | null>;
+
+  /**
+   * US-10: Busca un match específico por su ID para gestionar confirmaciones.
+   */
+  getMatchById(matchId: string): Promise<SwapMatch | null>;
+
+  /**
+   * US-10/11: Actualiza un match existente (estado, confirmaciones, tokens).
+   */
+  updateMatch(match: SwapMatch): Promise<void>;
 }
+

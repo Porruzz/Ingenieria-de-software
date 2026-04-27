@@ -19,4 +19,17 @@ export interface EnrollmentSystemPort {
    * Obtiene los detalles de una inscripción por su ID.
    */
   getEnrollmentById(enrollmentId: string): Promise<OfficialEnrollment | null>;
+
+  /**
+   * US-11: Formalización Legal del Cambio.
+   * Ejecuta el intercambio de cupos en la base de datos oficial de la universidad.
+   * Esta operación es atómica: o cambian los dos o no cambia ninguno.
+   */
+  registerOfficialSwap(
+    studentAId: string, 
+    enrollmentAId: string, 
+    studentBId: string, 
+    enrollmentBId: string
+  ): Promise<{ success: boolean, transactionId: string }>;
 }
+
