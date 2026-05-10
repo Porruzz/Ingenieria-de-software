@@ -27,6 +27,9 @@ import { DemandConflictController } from './interfaces/controllers/demand-confli
 import { GenerateDemandConflictReportUseCase } from './application/use-cases/generate-demand-conflict-report.use-case';
 import { InMemorySwapRepository } from './infrastructure/repositories/swap.repository';
 import { InMemoryCourseOfferingAdapter } from './infrastructure/adapters/course-offering.adapter';
+import { InMemoryScheduleRepository } from './infrastructure/repositories/schedule.repository';
+import { GenerateConcurrencyHeatMapUseCase } from './application/use-cases/generate-concurrency-heat-map.use-case';
+import { ConcurrencyHeatMapController } from './interfaces/controllers/concurrency-heat-map.controller';
 
 dotenv.config();
 
@@ -93,6 +96,11 @@ const courseOfferingAdapter = new InMemoryCourseOfferingAdapter();
 const generateDemandConflictReportUseCase = new GenerateDemandConflictReportUseCase(swapRepo, courseOfferingAdapter);
 const demandConflictController = new DemandConflictController(generateDemandConflictReportUseCase);
 
+// US-14 Setup
+const scheduleRepo = new InMemoryScheduleRepository();
+const generateConcurrencyHeatMapUseCase = new GenerateConcurrencyHeatMapUseCase(scheduleRepo);
+const concurrencyHeatMapController = new ConcurrencyHeatMapController(generateConcurrencyHeatMapUseCase);
+
 // Routes
 const router = express.Router();
 
@@ -113,6 +121,9 @@ router.post('/marketplace/offers/:offerId/interests', (req, res) => marketplaceC
 
 // US-15 Routes
 router.get('/reports/demand-conflict', (req, res) => demandConflictController.getReport(req, res));
+
+// US-14 Routes
+router.get('/reports/concurrency-heatmap', (req, res) => concurrencyHeatMapController.getHeatMap(req, res));
 
 app.use('/api', router);
 
