@@ -23,6 +23,10 @@ import { InMemoryEnrollmentSystemAdapter } from './infrastructure/adapters/in-me
 import { ConsoleNotificationService } from './infrastructure/services/console-notification.service';
 import { InMemoryPrerequisiteRepository } from './infrastructure/repositories/prerequisite.repository';
 import { EncryptedAcademicRepository } from './infrastructure/repositories/academic.repository';
+import { DemandConflictController } from './interfaces/controllers/demand-conflict-controller';
+import { GenerateDemandConflictReportUseCase } from './application/use-cases/generate-demand-conflict-report.use-case';
+import { InMemorySwapRepository } from './infrastructure/repositories/swap.repository';
+import { InMemoryCourseOfferingAdapter } from './infrastructure/adapters/course-offering.adapter';
 
 dotenv.config();
 
@@ -83,6 +87,12 @@ const marketplaceController = new MarketplaceController(
   marketplaceRepo
 );
 
+// US-15 Setup
+const swapRepo = new InMemorySwapRepository();
+const courseOfferingAdapter = new InMemoryCourseOfferingAdapter();
+const generateDemandConflictReportUseCase = new GenerateDemandConflictReportUseCase(swapRepo, courseOfferingAdapter);
+const demandConflictController = new DemandConflictController(generateDemandConflictReportUseCase);
+
 // Routes
 const router = express.Router();
 
@@ -100,6 +110,9 @@ router.get('/students/:studentId/criticality', (req, res) => criticalSubjectCont
 router.post('/marketplace/offers', (req, res) => marketplaceController.publish(req, res));
 router.get('/marketplace/courses/:courseId/offers', (req, res) => marketplaceController.getOffersByCourse(req, res));
 router.post('/marketplace/offers/:offerId/interests', (req, res) => marketplaceController.interest(req, res));
+
+// US-15 Routes
+router.get('/reports/demand-conflict', (req, res) => demandConflictController.getReport(req, res));
 
 app.use('/api', router);
 
