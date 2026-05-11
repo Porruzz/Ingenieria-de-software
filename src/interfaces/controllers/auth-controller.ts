@@ -86,6 +86,8 @@ export class AuthController {
         return res.status(401).json({ success: false, error: 'No autenticado.' });
       }
 
+      const fullUser = this.authService.getUserByStudentId(req.user.studentId);
+      
       return res.status(200).json({
         success: true,
         data: {
@@ -93,7 +95,9 @@ export class AuthController {
           studentId: req.user.studentId,
           email: req.user.email,
           fullName: req.user.fullName,
-          role: req.user.role
+          role: req.user.role,
+          program: fullUser?.program || 'No especificado',
+          semester: fullUser?.semester || 1
         }
       });
     } catch (error: any) {
