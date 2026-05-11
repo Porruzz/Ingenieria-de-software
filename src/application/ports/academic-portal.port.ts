@@ -15,5 +15,8 @@ export interface AcademicPortalPort {
    * Extrae el historial académico de un estudiante usando credenciales temporales.
    * RNF-02.2: No almacena credenciales.
    */
-  getAcademicHistory(studentId: string, universityToken: string): Promise<AcademicExtractionResult>;
+  /**
+   * Extrae el historial/inscripción actual a partir de una imagen (OCR).
+   */
+  getHistoryFromImage(imageBuffer: Buffer): Promise<AcademicExtractionResult>;
 }

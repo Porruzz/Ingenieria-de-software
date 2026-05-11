@@ -23,6 +23,8 @@ import { ConfirmBilateralSwapUseCase } from './application/use-cases/confirm-bil
 import { FormalizeSwapUseCase } from './application/use-cases/formalize-swap.use-case';
 import { GenerateDemandConflictReportUseCase } from './application/use-cases/generate-demand-conflict-report.use-case';
 import { GenerateConcurrencyHeatMapUseCase } from './application/use-cases/generate-concurrency-heat-map.use-case';
+import { HandleChatMessageUseCase } from './application/use-cases/handle-chat-message.use-case';
+import { CheckSystemHealthUseCase } from './application/use-cases/check-system-health.use-case';
 
 // ── Controllers ────────────────────────────────────────────────────────────────
 import { TimeBlockController } from './interfaces/controllers/time-block-controller';
@@ -34,6 +36,8 @@ import { ScheduleController } from './interfaces/controllers/schedule-controller
 import { SwapController } from './interfaces/controllers/swap-controller';
 import { DemandConflictController } from './interfaces/controllers/demand-conflict-controller';
 import { ConcurrencyHeatMapController } from './interfaces/controllers/concurrency-heat-map.controller';
+import { ChatbotController } from './interfaces/controllers/chatbot-controller';
+import { HealthController } from './interfaces/controllers/health-controller';
 
 // ── Adapters & Repositories ───────────────────────────────────────────────────
 import { InMemoryCriticalSubjectRepository } from './infrastructure/repositories/in-memory-critical-subject.repository';
@@ -46,6 +50,23 @@ import { SiaAdapter } from './infrastructure/adapters/sia-adapter';
 import { InMemoryCourseOfferingAdapter } from './infrastructure/adapters/course-offering.adapter';
 import { InMemoryScheduleRepository } from './infrastructure/repositories/schedule.repository';
 import { InMemorySwapRepository } from './infrastructure/repositories/swap.repository';
+import { SwapMatch } from './domain/entities/swap';
+import { VisionSiaAdapter } from './infrastructure/adapters/vision-sia.adapter';
+import multer from 'multer';
+
+// US-17: Chatbot
+import { GeminiChatbotAdapter } from './infrastructure/adapters/gemini-chatbot.adapter';
+import { InMemoryChatRepository } from './infrastructure/repositories/in-memory-chat.repository';
+
+// US-18: Stability
+import { RateLimiterService } from './infrastructure/services/rate-limiter.service';
+import { CircuitBreakerService } from './infrastructure/services/circuit-breaker.service';
+import { createRateLimiterMiddleware } from './infrastructure/middleware/rate-limiter.middleware';
+
+// Auth
+import { AuthService } from './infrastructure/auth/auth.service';
+import { createAuthMiddleware } from './infrastructure/auth/auth.middleware';
+import { AuthController } from './interfaces/controllers/auth-controller';
 
 // ── US-13 & US-16: Rutas modulares ────────────────────────────────────────────
 import notificationsRouter from './infrastructure/routes/notifications.routes';
@@ -65,7 +86,10 @@ app.use(cors({
 }));
 app.use(helmet());
 
-// ── Dependency Injection ───────────────────────────────────────────────────────
+// Multer Config (Memory Storage)
+const upload = multer({ storage: multer.memoryStorage() });
+
+// ── Dependency Injection Setup ────────────────────────────────────────────────
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
@@ -96,12 +120,12 @@ const academicRepo = new EncryptedAcademicRepository(cryptoService);
 const validatePrerequisitesUseCase = new ValidatePrerequisites(academicRepo, prereqRepo);
 const enrollmentSystem = new InMemoryEnrollmentSystemAdapter();
 
-// US-02: Sincronización con historial académico (SIA)
-const siaAdapter = new SiaAdapter();
-const syncUseCase = new SyncAcademicHistory(siaAdapter, academicRepo);
+// US-02: Sincronización con historial académico (Vision SIA)
+const visionSiaAdapter = new VisionSiaAdapter();
+const syncUseCase = new SyncAcademicHistory(visionSiaAdapter, academicRepo);
 const syncController = new SyncController(syncUseCase);
 
-// US-05: Generación de horario óptimo (AI Architect)
+// US-05: Generación de horario óptimo
 const courseOfferingAdapter = new InMemoryCourseOfferingAdapter();
 const scheduleRepo = new InMemoryScheduleRepository();
 const generateScheduleUseCase = new GenerateOptimalSchedule(courseOfferingAdapter, scheduleRepo);
@@ -117,6 +141,23 @@ const swapRepo = new InMemorySwapRepository();
 const confirmSwapUseCase = new ConfirmBilateralSwapUseCase(swapRepo);
 const formalizeSwapUseCase = new FormalizeSwapUseCase(swapRepo, enrollmentSystem);
 const swapController = new SwapController(confirmSwapUseCase, formalizeSwapUseCase);
+
+// US-17 Setup (Chatbot)
+const chatRepo = new InMemoryChatRepository();
+const geminiAdapter = new GeminiChatbotAdapter(process.env.GEMINI_API_KEY || '');
+const chatUseCase = new HandleChatMessageUseCase(chatRepo, geminiAdapter);
+const chatbotController = new ChatbotController(chatUseCase);
+
+// US-18 Setup (Stability & Health)
+const circuitBreaker = new CircuitBreakerService();
+const healthUseCase = new CheckSystemHealthUseCase(circuitBreaker);
+const healthController = new HealthController(healthUseCase);
+const rateLimiterService = new RateLimiterService(redisService);
+
+// Auth Setup
+const authService = new AuthService();
+const authController = new AuthController(authService);
+const authMiddleware = createAuthMiddleware(authService);
 
 // US-12: Marketplace de ofertas de cupos
 const marketplaceRepo = new InMemoryMarketplaceRepository();
@@ -143,17 +184,38 @@ const generateConcurrencyHeatMapUseCase = new GenerateConcurrencyHeatMapUseCase(
 const concurrencyHeatMapController = new ConcurrencyHeatMapController(generateConcurrencyHeatMapUseCase);
 
 // ── Rutas ──────────────────────────────────────────────────────────────────────
+
+// US-18: Aplicar Rate Limiter global
+app.use(createRateLimiterMiddleware(rateLimiterService));
+
+// US-18: Middleware de monitoreo
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  healthUseCase.incrementConnections();
+
+  res.on('finish', () => {
+    const responseTime = Date.now() - startTime;
+    const isError = res.statusCode >= 400;
+    healthUseCase.recordRequest(responseTime, isError);
+    healthUseCase.decrementConnections();
+  });
+
+  next();
+});
+
 const router = express.Router();
 
-// Health check — verifica que el servidor esté activo
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true,
-    status: 'online',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-  });
-});
+// ── RUTAS PÚBLICAS (no requieren token) ──
+router.post('/auth/login', (req, res) => authController.login(req, res));
+router.post('/auth/register', (req, res) => authController.register(req, res));
+router.get('/health', (req, res) => healthController.basicHealth(req, res));
+router.get('/health/detailed', (req, res) => healthController.detailedHealth(req, res));
+
+// ── RUTAS PROTEGIDAS (requieren token JWT) ──
+router.use(authMiddleware);
+
+// Auth - Perfil
+router.get('/auth/me', (req, res) => authController.me(req, res));
 
 // US-01 & US-03: Bloques de tiempo y logística
 router.post('/students/:studentId/time-blocks', (req, res) => timeBlockController.createBlock(req, res));
@@ -162,8 +224,9 @@ router.put('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockC
 router.delete('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockController.deleteBlock(req, res));
 router.put('/students/:studentId/logistics', (req, res) => studentController.updateLogistics(req, res));
 
-// US-02: Sincronización con SIA
+// US-02: Sincronización (tradicional e Imagen)
 router.post('/sync', (req, res) => syncController.sync(req, res));
+router.post('/sync/image', upload.single('schedule'), (req, res) => syncController.syncByImage(req, res));
 
 // US-05: Generación de horario óptimo
 router.post('/schedules/generate', (req, res) => scheduleController.generate(req, res));
@@ -176,7 +239,7 @@ router.patch('/swaps/confirm', (req, res) => swapController.confirm(req, res));
 router.post('/swaps/formalize', (req, res) => swapController.formalize(req, res));
 router.post('/swaps/reject', (req, res) => swapController.reject(req, res));
 
-// US-12: Marketplace de cupos disponibles
+// US-12: Marketplace de cupos
 router.post('/marketplace/offers', (req, res) => marketplaceController.publish(req, res));
 router.get('/marketplace/courses/:courseId/offers', (req, res) => marketplaceController.getOffersByCourse(req, res));
 router.post('/marketplace/offers/:offerId/interests', (req, res) => marketplaceController.interest(req, res));
@@ -187,12 +250,18 @@ router.get('/reports/demand-conflict', (req, res) => demandConflictController.ge
 // US-14: Reportes de mapa de calor de concurrencia
 router.get('/reports/concurrency-heatmap', (req, res) => concurrencyHeatMapController.getHeatMap(req, res));
 
+// US-17: Chatbot
+router.post('/chat/sessions', (req, res) => chatbotController.createSession(req, res));
+router.post('/chat/sessions/:sessionId/messages', (req, res) => chatbotController.sendMessage(req, res));
+router.get('/chat/sessions/:sessionId', (req, res) => chatbotController.getSession(req, res));
+router.delete('/chat/sessions/:sessionId', (req, res) => chatbotController.closeSession(req, res));
+
 app.use('/api', router);
 
-// US-13: Sugerencias de cursos y eventos culturales (router modular)
+// US-13: Sugerencias (router modular)
 app.use('/api/sugerencias', suggestionsRouter);
 
-// US-16: Alertas y notificaciones de cambios de estado (router modular)
+// US-16: Notificaciones (router modular)
 app.use('/api/notificaciones', notificationsRouter);
 
 // 404 — Ruta no encontrada
@@ -200,71 +269,72 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, message: 'Ruta no encontrada.' });
 });
 
-// ── Seeding de datos de prueba ─────────────────────────────────────────────────
-const seedMatch = async () => {
-  const dummyMatch = {
-    matchId: 'SW-98235-RUIZ',
-    status: 'PENDIENTE_CONFIRMACION',
-    studentA: {
-      id: 'santiago-123',
-      delivers: 'SEC-MAT101-A',
-      receives: 'SEC-PROG101-B',
-      confirmed: false
-    },
-    studentB: {
-      id: 'roberto-martinez',
-      delivers: 'SEC-PROG101-B',
-      receives: 'SEC-MAT101-A',
-      confirmed: false
-    },
-    improvementA: 15.5,
-    improvementB: 12.2,
-    systemSafetyHash: 'SAFE-8823-X',
-    createdAt: new Date()
-  };
+// ── Seeding de datos de demo ───────────────────────────────────────────────────
+const seedDemoData = async () => {
+  console.log('\n[Seed] ══════════════════════════════════════');
+  console.log('[Seed] Inicializando datos de demo...');
 
-  (enrollmentSystem as any).addEnrollment({
-    enrollmentId: 'SEC-FIS101-A',
-    studentId: 'santiago-123',
-    courseId: 'FIS101',
-    sectionId: 'A',
-    status: 'ACTIVO'
-  });
-  (enrollmentSystem as any).addEnrollment({
-    enrollmentId: 'SEC-MAT102-B',
-    studentId: 'elena-garcia',
-    courseId: 'MAT102',
-    sectionId: 'B',
-    status: 'ACTIVO'
-  });
+  // ── Inscripciones en el SIA (necesarias para swaps) ──
+  const enrollments = [
+    { enrollmentId: 'SEC-PCIA5040-A', studentId: 'santiago-123', courseId: 'PCIA5040', sectionId: 'A', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-PCIA5008-A', studentId: 'santiago-123', courseId: 'PCIA5008', sectionId: 'A', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-PCIA5009-A', studentId: 'santiago-123', courseId: 'PCIA5009', sectionId: 'A', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-MAT101-A',   studentId: 'santiago-123', courseId: 'MAT101',   sectionId: 'A', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-PROG101-B',  studentId: 'roberto-martinez', courseId: 'PROG101', sectionId: 'B', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-FIS101-A',   studentId: 'santiago-123', courseId: 'FIS101',   sectionId: 'A', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-MAT102-B',   studentId: 'elena-garcia',  courseId: 'MAT102',  sectionId: 'B', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-PCIA5040-B', studentId: 'roberto-martinez', courseId: 'PCIA5040', sectionId: 'B', status: 'ACTIVO' },
+    { enrollmentId: 'SEC-PCIA5008-B', studentId: 'elena-garcia', courseId: 'PCIA5008', sectionId: 'B', status: 'ACTIVO' },
+  ];
 
-  const dummyMatch2 = {
-    matchId: 'SW-98234-MART',
-    status: 'APROBADO',
-    studentA: {
-      id: 'santiago-123',
-      delivers: 'SEC-FIS101-A',
-      receives: 'SEC-MAT102-B',
-      confirmed: true
-    },
-    studentB: {
-      id: 'elena-garcia',
-      delivers: 'SEC-MAT102-B',
-      receives: 'SEC-FIS101-A',
-      confirmed: true
-    },
-    improvementA: 20.1,
-    improvementB: 18.5,
-    systemSafetyHash: 'SAFE-9941-Z',
-    createdAt: new Date()
-  };
+  for (const e of enrollments) {
+    (enrollmentSystem as any).addEnrollment(e);
+  }
+  console.log(`[Seed] ${enrollments.length} inscripciones registradas en SIA simulado.`);
 
-  await swapRepo.saveMatch(dummyMatch as any);
-  await swapRepo.saveMatch(dummyMatch2 as any);
-  console.log('[Seed] Datos de prueba inyectados listos.');
+  // ── Matches de Swap (diferentes estados para mostrar el flujo) ──
+  const matches: SwapMatch[] = [
+    {
+      matchId: 'SW-98235-RUIZ',
+      status: 'PENDIENTE_CONFIRMACION',
+      studentA: { id: 'santiago-123', delivers: 'SEC-MAT101-A', receives: 'SEC-PROG101-B', confirmed: false },
+      studentB: { id: 'roberto-martinez', delivers: 'SEC-PROG101-B', receives: 'SEC-MAT101-A', confirmed: false },
+      improvementA: 15.5, improvementB: 12.2,
+      systemSafetyHash: 'SAFE-8823-X', createdAt: new Date()
+    },
+    {
+      matchId: 'SW-98234-MART',
+      status: 'APROBADO',
+      studentA: { id: 'santiago-123', delivers: 'SEC-FIS101-A', receives: 'SEC-MAT102-B', confirmed: true },
+      studentB: { id: 'elena-garcia', delivers: 'SEC-MAT102-B', receives: 'SEC-FIS101-A', confirmed: true },
+      improvementA: 20.1, improvementB: 18.5,
+      systemSafetyHash: 'SAFE-9941-Z', createdAt: new Date()
+    },
+    {
+      matchId: 'SW-2026-DEMO',
+      status: 'FORMALIZADO',
+      studentA: { id: 'roberto-martinez', delivers: 'SEC-PCIA5040-B', receives: 'SEC-PCIA5008-B', confirmed: true },
+      studentB: { id: 'elena-garcia', delivers: 'SEC-PCIA5008-B', receives: 'SEC-PCIA5040-B', confirmed: true },
+      improvementA: 25.0, improvementB: 22.3,
+      systemSafetyHash: 'SAFE-DEMO-001', formalizationToken: 'FORMAL-USA-2026-001',
+      createdAt: new Date('2026-05-01')
+    }
+  ];
+
+  for (const m of matches) {
+    await swapRepo.saveMatch(m);
+  }
+  console.log(`[Seed] ${matches.length} swap matches creados (PENDIENTE, APROBADO, FORMALIZADO).`);
+
+  console.log('[Seed] ══════════════════════════════════════');
+  console.log('[Seed] ✅ Demo lista. Credenciales:');
+  console.log('[Seed]    📧 santiago.parra@usa.edu.co / demo123');
+  console.log('[Seed]    📧 roberto.martinez@usa.edu.co / demo123');
+  console.log('[Seed]    📧 elena.garcia@usa.edu.co / demo123');
+  console.log('[Seed] ══════════════════════════════════════\n');
 };
 
-seedMatch();
+seedDemoData();
 
 // ── Inicio del servidor ────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

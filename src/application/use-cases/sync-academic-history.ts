@@ -49,4 +49,25 @@ export class SyncAcademicHistory {
     
     return academicSummary;
   }
+
+  /**
+   * Sincroniza el estado académico a partir de una imagen.
+   */
+  async executeFromImage(studentId: string, imageBuffer: Buffer): Promise<AcademicSummary> {
+    console.log(`[Sync] Iniciando sincronización por imagen para: ${studentId}`);
+
+    const extractionResult = await this.portal.getHistoryFromImage(imageBuffer);
+    
+    const academicSummary: AcademicSummary = {
+      studentId,
+      records: extractionResult.records,
+      totalCredits: extractionResult.totalCredits,
+      currentSemester: extractionResult.currentSemester,
+      lastSync: new Date()
+    };
+
+    await this.repository.saveHistory(academicSummary);
+    
+    return academicSummary;
+  }
 }
