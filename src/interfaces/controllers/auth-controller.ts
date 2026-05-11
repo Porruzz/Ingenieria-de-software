@@ -89,7 +89,7 @@ export class AuthController {
       return res.status(200).json({
         success: true,
         data: {
-          userId: req.user.userId,
+          id: req.user.userId,
           studentId: req.user.studentId,
           email: req.user.email,
           fullName: req.user.fullName,
