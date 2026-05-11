@@ -77,4 +77,14 @@ router.post('/', (req: Request, res: Response) => {
   res.status(201).json({ ok: true, data: nueva });
 });
 
+/**
+ * DELETE /api/notificaciones/:estudianteId/borrar-todas
+ * Elimina TODAS las notificaciones de un estudiante.
+ */
+router.delete('/:estudianteId/borrar-todas', (req: Request, res: Response) => {
+  const { estudianteId } = req.params;
+  const cantidad = getNotifications.deleteAll(estudianteId);
+  res.json({ ok: true, message: `${cantidad} notificaciones eliminadas.`, cantidad });
+});
+
 export default router;

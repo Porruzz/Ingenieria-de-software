@@ -82,4 +82,27 @@ export class GetNotifications {
 
     return sinLeer.length;
   }
+
+  /**
+   * Elimina TODAS las notificaciones de un estudiante.
+   * Acción del botón "Borrar todas" en el Centro de Alertas.
+   *
+   * @param estudianteId ID del estudiante
+   * @returns Cantidad de notificaciones eliminadas
+   */
+  deleteAll(estudianteId: string): number {
+    const indices: number[] = [];
+    notificacionesStore.forEach((n, i) => {
+      if (n.estudianteId === estudianteId) indices.push(i);
+    });
+
+    // Eliminar en orden inverso para no alterar los índices
+    indices.reverse().forEach(i => notificacionesStore.splice(i, 1));
+
+    console.log(
+      `[US-16] ${indices.length} notificaciones eliminadas para estudiante ${estudianteId}.`
+    );
+
+    return indices.length;
+  }
 }
