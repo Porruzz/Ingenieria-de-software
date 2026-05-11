@@ -21,6 +21,7 @@ import { SyncAcademicHistory } from './application/use-cases/sync-academic-histo
 import { GenerateOptimalSchedule } from './application/use-cases/generate-schedule';
 import { ConfirmBilateralSwapUseCase } from './application/use-cases/confirm-bilateral-swap.use-case';
 import { FormalizeSwapUseCase } from './application/use-cases/formalize-swap.use-case';
+import { GetAvailableSections } from './application/use-cases/get-available-sections';
 import { GenerateDemandConflictReportUseCase } from './application/use-cases/generate-demand-conflict-report.use-case';
 import { GenerateConcurrencyHeatMapUseCase } from './application/use-cases/generate-concurrency-heat-map.use-case';
 
@@ -32,6 +33,7 @@ import { MarketplaceController } from './interfaces/controllers/marketplace-cont
 import { SyncController } from './interfaces/controllers/sync-controller';
 import { ScheduleController } from './interfaces/controllers/schedule-controller';
 import { SwapController } from './interfaces/controllers/swap-controller';
+import { CourseController } from './interfaces/controllers/course-controller';
 import { DemandConflictController } from './interfaces/controllers/demand-conflict-controller';
 import { ConcurrencyHeatMapController } from './interfaces/controllers/concurrency-heat-map.controller';
 
@@ -58,11 +60,7 @@ const app = express();
 
 // ── Middlewares ────────────────────────────────────────────────────────────────
 app.use(express.json());
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173'],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors()); // Abrir a todo para pruebas
 app.use(helmet());
 
 // ── Dependency Injection ───────────────────────────────────────────────────────
@@ -112,6 +110,10 @@ const criticalSubjectRepo = new InMemoryCriticalSubjectRepository();
 const calculateCriticalityUseCase = new CalculateCriticalityUseCase(criticalSubjectRepo, prereqRepo);
 const criticalSubjectController = new CriticalSubjectController(calculateCriticalityUseCase);
 
+// US-08: Consulta de cupos disponibles
+const getAvailableSections = new GetAvailableSections();
+const courseController = new CourseController(getAvailableSections);
+
 // US-10 & US-11: Confirmación bilateral y formalización de intercambios
 const swapRepo = new InMemorySwapRepository();
 const confirmSwapUseCase = new ConfirmBilateralSwapUseCase(swapRepo);
@@ -145,6 +147,10 @@ const concurrencyHeatMapController = new ConcurrencyHeatMapController(generateCo
 // ── Rutas ──────────────────────────────────────────────────────────────────────
 const router = express.Router();
 
+app.get('/', (_req, res) => {
+  res.send('<h1>🎓 Backend de OptimaAcademia está ACTIVO</h1><p>Si ves esto, la conexión funciona.</p>');
+});
+
 // Health check — verifica que el servidor esté activo
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -170,6 +176,12 @@ router.post('/schedules/generate', (req, res) => scheduleController.generate(req
 
 // US-07: Criticidad de materias
 router.get('/students/:studentId/criticality', (req, res) => criticalSubjectController.getCriticality(req, res));
+
+// US-08: Secciones y cupos disponibles
+router.get('/secciones/:courseId/disponibles', (req, res) => {
+  console.log(`[Backend] Petición US-08 recibida para materia: ${req.params.courseId}`);
+  return courseController.getSections(req, res);
+});
 
 // US-10 & US-11: Confirmación y formalización de swaps
 router.patch('/swaps/confirm', (req, res) => swapController.confirm(req, res));
@@ -269,7 +281,7 @@ seedMatch();
 // ── Inicio del servidor ────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log('');
   console.log('  🎓 OptimaAcademia Backend corriendo');
   console.log(`  ➜  Health:    http://localhost:${PORT}/api/health`);
