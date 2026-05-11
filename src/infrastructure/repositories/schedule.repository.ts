@@ -56,4 +56,11 @@ export class InMemoryScheduleRepository implements ScheduleRepositoryPort {
   async debugGetAll(): Promise<GeneratedSchedule[]> {
     return Array.from(this.database.values());
   }
+
+  /**
+   * Obtiene todos los horarios que han sido aceptados por los estudiantes.
+   */
+  async getAllAcceptedSchedules(): Promise<GeneratedSchedule[]> {
+    return Array.from(this.database.values()).filter(schedule => schedule.status === 'ACEPTADO');
+  }
 }

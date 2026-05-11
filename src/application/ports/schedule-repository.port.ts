@@ -22,4 +22,10 @@ export interface ScheduleRepositoryPort {
    * RF-05.7: El estudiante puede aceptar o rechazar.
    */
   updateStatus(scheduleId: string, status: 'ACEPTADO' | 'RECHAZADO'): Promise<void>;
+
+  /**
+   * Obtiene todos los horarios que han sido aceptados por los estudiantes.
+   * Útil para reportes globales (ej. US-14 Mapa de Calor).
+   */
+  getAllAcceptedSchedules(): Promise<GeneratedSchedule[]>;
 }

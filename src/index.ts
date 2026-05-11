@@ -21,6 +21,8 @@ import { SyncAcademicHistory } from './application/use-cases/sync-academic-histo
 import { GenerateOptimalSchedule } from './application/use-cases/generate-schedule';
 import { ConfirmBilateralSwapUseCase } from './application/use-cases/confirm-bilateral-swap.use-case';
 import { FormalizeSwapUseCase } from './application/use-cases/formalize-swap.use-case';
+import { GenerateDemandConflictReportUseCase } from './application/use-cases/generate-demand-conflict-report.use-case';
+import { GenerateConcurrencyHeatMapUseCase } from './application/use-cases/generate-concurrency-heat-map.use-case';
 
 // ── Controllers ────────────────────────────────────────────────────────────────
 import { TimeBlockController } from './interfaces/controllers/time-block-controller';
@@ -30,6 +32,8 @@ import { MarketplaceController } from './interfaces/controllers/marketplace-cont
 import { SyncController } from './interfaces/controllers/sync-controller';
 import { ScheduleController } from './interfaces/controllers/schedule-controller';
 import { SwapController } from './interfaces/controllers/swap-controller';
+import { DemandConflictController } from './interfaces/controllers/demand-conflict-controller';
+import { ConcurrencyHeatMapController } from './interfaces/controllers/concurrency-heat-map.controller';
 
 // ── Adapters & Repositories ───────────────────────────────────────────────────
 import { InMemoryCriticalSubjectRepository } from './infrastructure/repositories/in-memory-critical-subject.repository';
@@ -130,6 +134,14 @@ const marketplaceController = new MarketplaceController(
   marketplaceRepo
 );
 
+// US-15: Reporte de conflictos de demanda
+const generateDemandConflictReportUseCase = new GenerateDemandConflictReportUseCase(swapRepo, courseOfferingAdapter);
+const demandConflictController = new DemandConflictController(generateDemandConflictReportUseCase);
+
+// US-14: Mapa de calor de concurrencia
+const generateConcurrencyHeatMapUseCase = new GenerateConcurrencyHeatMapUseCase(scheduleRepo);
+const concurrencyHeatMapController = new ConcurrencyHeatMapController(generateConcurrencyHeatMapUseCase);
+
 // ── Rutas ──────────────────────────────────────────────────────────────────────
 const router = express.Router();
 
@@ -169,6 +181,12 @@ router.post('/marketplace/offers', (req, res) => marketplaceController.publish(r
 router.get('/marketplace/courses/:courseId/offers', (req, res) => marketplaceController.getOffersByCourse(req, res));
 router.post('/marketplace/offers/:offerId/interests', (req, res) => marketplaceController.interest(req, res));
 
+// US-15: Reportes de conflicto de demanda
+router.get('/reports/demand-conflict', (req, res) => demandConflictController.getReport(req, res));
+
+// US-14: Reportes de mapa de calor de concurrencia
+router.get('/reports/concurrency-heatmap', (req, res) => concurrencyHeatMapController.getHeatMap(req, res));
+
 app.use('/api', router);
 
 // US-13: Sugerencias de cursos y eventos culturales (router modular)
@@ -183,7 +201,6 @@ app.use((_req, res) => {
 });
 
 // ── Seeding de datos de prueba ─────────────────────────────────────────────────
-// Inyecta matches de swap para que US-10 y US-11 sean testables inmediatamente
 const seedMatch = async () => {
   const dummyMatch = {
     matchId: 'SW-98235-RUIZ',
@@ -206,7 +223,6 @@ const seedMatch = async () => {
     createdAt: new Date()
   };
 
-  // Inscripciones oficiales en el SIA para seed de US-11
   (enrollmentSystem as any).addEnrollment({
     enrollmentId: 'SEC-FIS101-A',
     studentId: 'santiago-123',
@@ -245,7 +261,7 @@ const seedMatch = async () => {
 
   await swapRepo.saveMatch(dummyMatch as any);
   await swapRepo.saveMatch(dummyMatch2 as any);
-  console.log('[Seed] Datos de prueba inyectados: Match SW-98235-RUIZ y SW-98234-MART listos.');
+  console.log('[Seed] Datos de prueba inyectados listos.');
 };
 
 seedMatch();
@@ -257,10 +273,8 @@ app.listen(PORT, () => {
   console.log('');
   console.log('  🎓 OptimaAcademia Backend corriendo');
   console.log(`  ➜  Health:    http://localhost:${PORT}/api/health`);
-  console.log(`  ➜  US-13:     http://localhost:${PORT}/api/sugerencias`);
-  console.log(`  ➜  US-16:     http://localhost:${PORT}/api/notificaciones/EST-001`);
-  console.log(`  ➜  US-10/11:  http://localhost:${PORT}/api/swaps/confirm`);
-  console.log(`  ➜  US-12:     http://localhost:${PORT}/api/marketplace/offers`);
+  console.log(`  ➜  US-14/15:  http://localhost:${PORT}/api/reports/...`);
+  console.log(`  ➜  US-13/16:  http://localhost:${PORT}/api/sugerencias | /notificaciones`);
   console.log(`  ➜  CORS:      http://localhost:5173`);
   console.log('');
 });

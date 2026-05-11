@@ -11,7 +11,7 @@ yarn-error.log*
 *.swp
 *.swo
 
-# Java — clases compiladas (no se versiona el bytecode, solo los fuentes)
+# Java — clases compiladas
 out/
 target/
 *.class
