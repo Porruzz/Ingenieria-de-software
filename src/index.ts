@@ -4,13 +4,13 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 
-// Core Infrastructure
+// ── Core Infrastructure ────────────────────────────────────────────────────────
 import { CryptoService } from './infrastructure/security/crypto-service';
 import { RedisService } from './infrastructure/cache/redis-service';
 import { PostgresTimeBlockRepository } from './infrastructure/database/postgres-time-block-repository';
 import { PostgresStudentRepository } from './infrastructure/database/postgres-student-repository';
 
-// Use Cases
+// ── Use Cases ──────────────────────────────────────────────────────────────────
 import { ManageTimeBlocksUseCase } from './application/use-cases/manage-time-blocks';
 import { UpdateStudentLogisticsUseCase } from './application/use-cases/update-student-logistics';
 import { CalculateCriticalityUseCase } from './application/use-cases/calculate-criticality.use-case';
@@ -22,7 +22,7 @@ import { GenerateOptimalSchedule } from './application/use-cases/generate-schedu
 import { ConfirmBilateralSwapUseCase } from './application/use-cases/confirm-bilateral-swap.use-case';
 import { FormalizeSwapUseCase } from './application/use-cases/formalize-swap.use-case';
 
-// Controllers
+// ── Controllers ────────────────────────────────────────────────────────────────
 import { TimeBlockController } from './interfaces/controllers/time-block-controller';
 import { StudentController } from './interfaces/controllers/student-controller';
 import { CriticalSubjectController } from './interfaces/controllers/critical-subject-controller';
@@ -31,7 +31,7 @@ import { SyncController } from './interfaces/controllers/sync-controller';
 import { ScheduleController } from './interfaces/controllers/schedule-controller';
 import { SwapController } from './interfaces/controllers/swap-controller';
 
-// Adapters & Repositories
+// ── Adapters & Repositories ───────────────────────────────────────────────────
 import { InMemoryCriticalSubjectRepository } from './infrastructure/repositories/in-memory-critical-subject.repository';
 import { InMemoryMarketplaceRepository } from './infrastructure/repositories/in-memory-marketplace.repository';
 import { InMemoryEnrollmentSystemAdapter } from './infrastructure/adapters/in-memory-enrollment-system.adapter';
@@ -43,21 +43,25 @@ import { InMemoryCourseOfferingAdapter } from './infrastructure/adapters/course-
 import { InMemoryScheduleRepository } from './infrastructure/repositories/schedule.repository';
 import { InMemorySwapRepository } from './infrastructure/repositories/swap.repository';
 
+// ── US-13 & US-16: Rutas modulares ────────────────────────────────────────────
+import notificationsRouter from './infrastructure/routes/notifications.routes';
+import suggestionsRouter  from './infrastructure/routes/suggestions.routes';
 
 dotenv.config();
 
+// ── App ────────────────────────────────────────────────────────────────────────
 const app = express();
 
-// Middlewares
+// ── Middlewares ────────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(helmet());
 
-// Dependency Injection Setup
+// ── Dependency Injection ───────────────────────────────────────────────────────
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
@@ -72,47 +76,45 @@ const cryptoService = new CryptoService(
 
 const redisService = new RedisService(`redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`);
 
-// US-01 Setup
+// US-01: Gestión de bloques de tiempo
 const timeBlockRepo = new PostgresTimeBlockRepository(pool, cryptoService);
 const manageTimeBlocksUseCase = new ManageTimeBlocksUseCase(timeBlockRepo, redisService);
 const timeBlockController = new TimeBlockController(manageTimeBlocksUseCase);
 
-// US-03 Setup
+// US-03: Actualización de logística estudiantil
 const studentRepo = new PostgresStudentRepository(pool);
 const updateStudentLogisticsUseCase = new UpdateStudentLogisticsUseCase(studentRepo, redisService);
 const studentController = new StudentController(updateStudentLogisticsUseCase);
 
-// Shared Dependencies
+// Dependencias compartidas entre múltiples US
 const prereqRepo = new InMemoryPrerequisiteRepository();
 const academicRepo = new EncryptedAcademicRepository(cryptoService);
 const validatePrerequisitesUseCase = new ValidatePrerequisites(academicRepo, prereqRepo);
 const enrollmentSystem = new InMemoryEnrollmentSystemAdapter();
 
-// US-02 Setup (Sync)
+// US-02: Sincronización con historial académico (SIA)
 const siaAdapter = new SiaAdapter();
 const syncUseCase = new SyncAcademicHistory(siaAdapter, academicRepo);
 const syncController = new SyncController(syncUseCase);
 
-// US-05 Setup (Schedule Architect)
+// US-05: Generación de horario óptimo (AI Architect)
 const courseOfferingAdapter = new InMemoryCourseOfferingAdapter();
 const scheduleRepo = new InMemoryScheduleRepository();
 const generateScheduleUseCase = new GenerateOptimalSchedule(courseOfferingAdapter, scheduleRepo);
 const scheduleController = new ScheduleController(generateScheduleUseCase);
 
-// US-07 Setup (Criticality)
+// US-07: Cálculo de criticidad de materias
 const criticalSubjectRepo = new InMemoryCriticalSubjectRepository();
 const calculateCriticalityUseCase = new CalculateCriticalityUseCase(criticalSubjectRepo, prereqRepo);
 const criticalSubjectController = new CriticalSubjectController(calculateCriticalityUseCase);
 
-// US-10 & US-11 Setup (Swap Confirmation & Formalization)
+// US-10 & US-11: Confirmación bilateral y formalización de intercambios
 const swapRepo = new InMemorySwapRepository();
 const confirmSwapUseCase = new ConfirmBilateralSwapUseCase(swapRepo);
 const formalizeSwapUseCase = new FormalizeSwapUseCase(swapRepo, enrollmentSystem);
 const swapController = new SwapController(confirmSwapUseCase, formalizeSwapUseCase);
 
-
-
-// US-12 Setup (Marketplace)
+// US-12: Marketplace de ofertas de cupos
 const marketplaceRepo = new InMemoryMarketplaceRepository();
 const notificationService = new ConsoleNotificationService();
 const publishOfferUseCase = new PublishOfferUseCase(enrollmentSystem, marketplaceRepo);
@@ -122,48 +124,68 @@ const registerInterestUseCase = new RegisterInterestUseCase(
   notificationService,
   validatePrerequisitesUseCase
 );
-
 const marketplaceController = new MarketplaceController(
   publishOfferUseCase,
   registerInterestUseCase,
   marketplaceRepo
 );
 
-// Routes
+// ── Rutas ──────────────────────────────────────────────────────────────────────
 const router = express.Router();
 
-// US-01 & US-03
+// Health check — verifica que el servidor esté activo
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    status: 'online',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+  });
+});
+
+// US-01 & US-03: Bloques de tiempo y logística
 router.post('/students/:studentId/time-blocks', (req, res) => timeBlockController.createBlock(req, res));
 router.get('/students/:studentId/time-blocks', (req, res) => timeBlockController.getBlocks(req, res));
 router.put('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockController.updateBlock(req, res));
 router.delete('/students/:studentId/time-blocks/:blockId', (req, res) => timeBlockController.deleteBlock(req, res));
 router.put('/students/:studentId/logistics', (req, res) => studentController.updateLogistics(req, res));
 
-// US-02
+// US-02: Sincronización con SIA
 router.post('/sync', (req, res) => syncController.sync(req, res));
 
-// US-05
+// US-05: Generación de horario óptimo
 router.post('/schedules/generate', (req, res) => scheduleController.generate(req, res));
 
-// US-07
+// US-07: Criticidad de materias
 router.get('/students/:studentId/criticality', (req, res) => criticalSubjectController.getCriticality(req, res));
 
-// US-10 & US-11
+// US-10 & US-11: Confirmación y formalización de swaps
 router.patch('/swaps/confirm', (req, res) => swapController.confirm(req, res));
 router.post('/swaps/formalize', (req, res) => swapController.formalize(req, res));
 router.post('/swaps/reject', (req, res) => swapController.reject(req, res));
 
-
-// US-12
+// US-12: Marketplace de cupos disponibles
 router.post('/marketplace/offers', (req, res) => marketplaceController.publish(req, res));
 router.get('/marketplace/courses/:courseId/offers', (req, res) => marketplaceController.getOffersByCourse(req, res));
 router.post('/marketplace/offers/:offerId/interests', (req, res) => marketplaceController.interest(req, res));
 
 app.use('/api', router);
 
-// SEEDING: Datos de prueba para que Santiago pueda probar Swaps (US-10 y US-11) inmediatamente
+// US-13: Sugerencias de cursos y eventos culturales (router modular)
+app.use('/api/sugerencias', suggestionsRouter);
+
+// US-16: Alertas y notificaciones de cambios de estado (router modular)
+app.use('/api/notificaciones', notificationsRouter);
+
+// 404 — Ruta no encontrada
+app.use((_req, res) => {
+  res.status(404).json({ ok: false, message: 'Ruta no encontrada.' });
+});
+
+// ── Seeding de datos de prueba ─────────────────────────────────────────────────
+// Inyecta matches de swap para que US-10 y US-11 sean testables inmediatamente
 const seedMatch = async () => {
-  const dummyMatch: SwapMatch = {
+  const dummyMatch = {
     matchId: 'SW-98235-RUIZ',
     status: 'PENDIENTE_CONFIRMACION',
     studentA: {
@@ -184,7 +206,7 @@ const seedMatch = async () => {
     createdAt: new Date()
   };
 
-  // Seed para US-11 (Inscripciones oficiales en el SIA)
+  // Inscripciones oficiales en el SIA para seed de US-11
   (enrollmentSystem as any).addEnrollment({
     enrollmentId: 'SEC-FIS101-A',
     studentId: 'santiago-123',
@@ -200,7 +222,7 @@ const seedMatch = async () => {
     status: 'ACTIVO'
   });
 
-  const dummyMatch2: SwapMatch = {
+  const dummyMatch2 = {
     matchId: 'SW-98234-MART',
     status: 'APROBADO',
     studentA: {
@@ -221,22 +243,26 @@ const seedMatch = async () => {
     createdAt: new Date()
   };
 
-
-  await swapRepo.saveMatch(dummyMatch);
-  await swapRepo.saveMatch(dummyMatch2);
+  await swapRepo.saveMatch(dummyMatch as any);
+  await swapRepo.saveMatch(dummyMatch2 as any);
   console.log('[Seed] Datos de prueba inyectados: Match SW-98235-RUIZ y SW-98234-MART listos.');
 };
 
-
-
 seedMatch();
 
+// ── Inicio del servidor ────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
-
 app.listen(PORT, () => {
-  console.log(`[Server] Corriendo en puerto ${PORT}`);
-  console.log(`[CORS] Permitido para http://localhost:5173`);
+  console.log('');
+  console.log('  🎓 OptimaAcademia Backend corriendo');
+  console.log(`  ➜  Health:    http://localhost:${PORT}/api/health`);
+  console.log(`  ➜  US-13:     http://localhost:${PORT}/api/sugerencias`);
+  console.log(`  ➜  US-16:     http://localhost:${PORT}/api/notificaciones/EST-001`);
+  console.log(`  ➜  US-10/11:  http://localhost:${PORT}/api/swaps/confirm`);
+  console.log(`  ➜  US-12:     http://localhost:${PORT}/api/marketplace/offers`);
+  console.log(`  ➜  CORS:      http://localhost:5173`);
+  console.log('');
 });
 
-
+export default app;
