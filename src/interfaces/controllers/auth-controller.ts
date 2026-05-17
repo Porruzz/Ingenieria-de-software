@@ -143,4 +143,27 @@ export class AuthController {
       }
     }
   }
+
+  async me(req: any, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, error: 'No autenticado.' });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          id: req.user.userId || req.user.studentId,
+          studentId: req.user.studentId,
+          email: req.user.email,
+          fullName: req.user.fullName,
+          role: req.user.role,
+          program: req.user.program || 'No especificado',
+          semester: req.user.semester || 1
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 }
