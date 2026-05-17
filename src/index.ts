@@ -170,7 +170,6 @@ const rateLimiterService = new RateLimiterService(redisService);
 
 // Auth Setup
 const authService = new AuthService();
-const authController = new AuthController(authService);
 const authMiddleware = createAuthMiddleware(authService);
 
 // US-12: Marketplace de ofertas de cupos
