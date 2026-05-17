@@ -55,6 +55,7 @@ import { InMemoryCriticalSubjectRepository } from './infrastructure/repositories
 import { InMemoryMarketplaceRepository } from './infrastructure/repositories/in-memory-marketplace.repository';
 import { InMemoryEnrollmentSystemAdapter } from './infrastructure/adapters/in-memory-enrollment-system.adapter';
 import { ConsoleNotificationService } from './infrastructure/services/console-notification.service';
+import { EmailNotificationService } from './infrastructure/services/email-notification.service';
 import { InMemoryPrerequisiteRepository } from './infrastructure/repositories/prerequisite.repository';
 import { EncryptedAcademicRepository } from './infrastructure/repositories/academic.repository';
 import { SiaAdapter } from './infrastructure/adapters/sia-adapter';
@@ -175,7 +176,7 @@ const authMiddleware = createAuthMiddleware(authService);
 
 // US-12: Marketplace de ofertas de cupos
 const marketplaceRepo = new InMemoryMarketplaceRepository();
-const notificationService = new ConsoleNotificationService();
+const notificationService = new EmailNotificationService(studentRepo);
 const publishOfferUseCase = new PublishOfferUseCase(enrollmentSystem, marketplaceRepo);
 const registerInterestUseCase = new RegisterInterestUseCase(
   marketplaceRepo,
