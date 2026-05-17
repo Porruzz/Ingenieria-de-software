@@ -31,6 +31,7 @@ import { PasswordHasher } from './infrastructure/security/password-hasher';
 import { RequestPasswordResetUseCase } from './application/use-cases/auth/request-password-reset';
 import { ResetPasswordUseCase } from './application/use-cases/auth/reset-password';
 import { SSOLoginUseCase } from './application/use-cases/auth/sso-login';
+import { GoogleLoginUseCase } from './application/use-cases/auth/google-login';
 import { HandleChatMessageUseCase } from './application/use-cases/handle-chat-message.use-case';
 import { CheckSystemHealthUseCase } from './application/use-cases/check-system-health.use-case';
 
@@ -202,12 +203,14 @@ const loginStudentUseCase = new LoginStudentUseCase(studentRepo, cryptoService);
 const requestPasswordResetUseCase = new RequestPasswordResetUseCase(studentRepo, notificationService);
 const resetPasswordUseCase = new ResetPasswordUseCase(studentRepo);
 const ssoLoginUseCase = new SSOLoginUseCase(studentRepo, cryptoService);
+const googleLoginUseCase = new GoogleLoginUseCase(studentRepo, cryptoService);
 const authController = new AuthController(
   registerStudentUseCase,
   loginStudentUseCase,
   requestPasswordResetUseCase,
   resetPasswordUseCase,
-  ssoLoginUseCase
+  ssoLoginUseCase,
+  googleLoginUseCase
 );
 
 // ── Rutas ──────────────────────────────────────────────────────────────────────
@@ -252,6 +255,7 @@ router.post('/auth/register', (req, res) => authController.register(req, res));
 router.post('/auth/forgot-password', (req, res) => authController.forgotPassword(req, res));
 router.post('/auth/reset-password', (req, res) => authController.resetPassword(req, res));
 router.post('/auth/sso/callback', (req, res) => authController.ssoCallback(req, res));
+router.post('/auth/google/callback', (req, res) => authController.googleCallback(req, res));
 router.get('/health', (req, res) => healthController.basicHealth(req, res));
 router.get('/health/detailed', (req, res) => healthController.detailedHealth(req, res));
 

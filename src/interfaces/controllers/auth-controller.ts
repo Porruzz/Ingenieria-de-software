@@ -4,6 +4,7 @@ import { LoginStudentUseCase } from '../../application/use-cases/auth/login-stud
 import { RequestPasswordResetUseCase } from '../../application/use-cases/auth/request-password-reset';
 import { ResetPasswordUseCase } from '../../application/use-cases/auth/reset-password';
 import { SSOLoginUseCase } from '../../application/use-cases/auth/sso-login';
+import { GoogleLoginUseCase } from '../../application/use-cases/auth/google-login';
 
 export class AuthController {
   constructor(
@@ -11,7 +12,8 @@ export class AuthController {
     private readonly loginUseCase: LoginStudentUseCase,
     private readonly requestResetUseCase: RequestPasswordResetUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
-    private readonly ssoLoginUseCase: SSOLoginUseCase
+    private readonly ssoLoginUseCase: SSOLoginUseCase,
+    private readonly googleLoginUseCase: GoogleLoginUseCase
   ) {}
 
   async register(req: Request, res: Response) {
@@ -137,6 +139,39 @@ export class AuthController {
       });
     } catch (error: any) {
       if (error.message.includes('requerido') || error.message.includes('dominio')) {
+        res.status(400).json({ success: false, error: error.message });
+      } else {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    }
+  }
+
+  async googleCallback(req: Request, res: Response) {
+    try {
+      const { email, nombreCompleto } = req.body;
+      const result = await this.googleLoginUseCase.execute({ email, nombreCompleto });
+      
+      res.status(200).json({
+        success: true,
+        message: 'Sesión de Google iniciada correctamente.',
+        data: {
+          token: result.token,
+          student: {
+            id: result.student.id,
+            nombreCompleto: result.student.nombreCompleto,
+            emailInstitucional: result.student.emailInstitucional,
+            identificacionUniversidad: result.student.identificacionUniversidad,
+            creditosAprobados: result.student.creditosAprobados,
+            promedioAcumulado: result.student.promedioAcumulado,
+            trabaja: result.student.trabaja,
+            horasTrabajoSemanal: result.student.horasTrabajoSemanal,
+            tiempoTrasladoMin: result.student.tiempoTrasladoMin,
+            bufferSeguridadMin: result.student.bufferSeguridadMin
+          }
+        }
+      });
+    } catch (error: any) {
+      if (error.message.includes('requerido') || error.message.includes('válido')) {
         res.status(400).json({ success: false, error: error.message });
       } else {
         res.status(500).json({ success: false, error: error.message });
