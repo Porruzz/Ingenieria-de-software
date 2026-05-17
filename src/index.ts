@@ -24,10 +24,18 @@ import { FormalizeSwapUseCase } from './application/use-cases/formalize-swap.use
 import { GetAvailableSections } from './application/use-cases/get-available-sections';
 import { GenerateDemandConflictReportUseCase } from './application/use-cases/generate-demand-conflict-report.use-case';
 import { GenerateConcurrencyHeatMapUseCase } from './application/use-cases/generate-concurrency-heat-map.use-case';
+import { RegisterStudentUseCase } from './application/use-cases/auth/register-student';
+import { LoginStudentUseCase } from './application/use-cases/auth/login-student';
+import { Student } from './domain/entities/student';
+import { PasswordHasher } from './infrastructure/security/password-hasher';
+import { RequestPasswordResetUseCase } from './application/use-cases/auth/request-password-reset';
+import { ResetPasswordUseCase } from './application/use-cases/auth/reset-password';
+import { SSOLoginUseCase } from './application/use-cases/auth/sso-login';
 
 // ── Controllers ────────────────────────────────────────────────────────────────
 import { TimeBlockController } from './interfaces/controllers/time-block-controller';
 import { StudentController } from './interfaces/controllers/student-controller';
+import { AuthController } from './interfaces/controllers/auth-controller';
 import { CriticalSubjectController } from './interfaces/controllers/critical-subject-controller';
 import { MarketplaceController } from './interfaces/controllers/marketplace-controller';
 import { SyncController } from './interfaces/controllers/sync-controller';
@@ -144,6 +152,20 @@ const demandConflictController = new DemandConflictController(generateDemandConf
 const generateConcurrencyHeatMapUseCase = new GenerateConcurrencyHeatMapUseCase(scheduleRepo);
 const concurrencyHeatMapController = new ConcurrencyHeatMapController(generateConcurrencyHeatMapUseCase);
 
+// US-17 & US-18: Autenticación y Restablecimiento de Contraseña
+const registerStudentUseCase = new RegisterStudentUseCase(studentRepo);
+const loginStudentUseCase = new LoginStudentUseCase(studentRepo, cryptoService);
+const requestPasswordResetUseCase = new RequestPasswordResetUseCase(studentRepo, notificationService);
+const resetPasswordUseCase = new ResetPasswordUseCase(studentRepo);
+const ssoLoginUseCase = new SSOLoginUseCase(studentRepo, cryptoService);
+const authController = new AuthController(
+  registerStudentUseCase,
+  loginStudentUseCase,
+  requestPasswordResetUseCase,
+  resetPasswordUseCase,
+  ssoLoginUseCase
+);
+
 // ── Rutas ──────────────────────────────────────────────────────────────────────
 const router = express.Router();
 
@@ -198,6 +220,13 @@ router.get('/reports/demand-conflict', (req, res) => demandConflictController.ge
 
 // US-14: Reportes de mapa de calor de concurrencia
 router.get('/reports/concurrency-heatmap', (req, res) => concurrencyHeatMapController.getHeatMap(req, res));
+
+// US-17 & US-18: Autenticación y recuperación de contraseñas
+router.post('/auth/register', (req, res) => authController.register(req, res));
+router.post('/auth/login', (req, res) => authController.login(req, res));
+router.post('/auth/forgot-password', (req, res) => authController.forgotPassword(req, res));
+router.post('/auth/reset-password', (req, res) => authController.resetPassword(req, res));
+router.post('/auth/sso/callback', (req, res) => authController.ssoCallback(req, res));
 
 app.use('/api', router);
 
@@ -277,6 +306,38 @@ const seedMatch = async () => {
 };
 
 seedMatch();
+
+const seedStudent = async () => {
+  try {
+    const existing = await studentRepo.findByEmail('juanr@optima.edu.co');
+    if (!existing) {
+      const passwordHash = PasswordHasher.hash('password123');
+      const demoStudent = new Student({
+        id: 'juanr-123',
+        identificacionUniversidad: '202310156',
+        nombreCompleto: 'Juan Rodríguez',
+        emailInstitucional: 'juanr@optima.edu.co',
+        creditosAprobados: 85,
+        promedioAcumulado: 4.2,
+        trabaja: true,
+        horasTrabajoSemanal: 12,
+        tiempoTrasladoMin: 45,
+        bufferSeguridadMin: 15,
+        academicHistory: [],
+        prohibitedTimeBlocks: [],
+        passwordHash
+      });
+      await studentRepo.createStudent(demoStudent, passwordHash);
+      console.log('[Seed] Estudiante de prueba "juanr@optima.edu.co" creado exitosamente.');
+    } else {
+      console.log('[Seed] Estudiante de prueba "juanr@optima.edu.co" ya existe.');
+    }
+  } catch (err) {
+    console.error('[Seed] Error al sembrar estudiante de prueba:', err);
+  }
+};
+
+seedStudent();
 
 // ── Inicio del servidor ────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

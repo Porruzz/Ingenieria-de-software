@@ -14,6 +14,9 @@ export interface StudentProps {
   bufferSeguridadMin: number;
   academicHistory: string[]; // IDs de materias aprobadas
   prohibitedTimeBlocks: ProhibitedTimeBlock[];
+  passwordHash?: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpires?: Date | null;
 }
 
 /**
@@ -38,12 +41,21 @@ export class Student {
 
   get id(): string { return this.props.id; }
   get nombreCompleto(): string { return this.props.nombreCompleto; }
+  get emailInstitucional(): string { return this.props.emailInstitucional; }
+  get identificacionUniversidad(): string { return this.props.identificacionUniversidad; }
+  get creditosAprobados(): number { return this.props.creditosAprobados; }
+  get promedioAcumulado(): number { return this.props.promedioAcumulado; }
+  get trabaja(): boolean { return this.props.trabaja; }
+  get horasTrabajoSemanal(): number { return this.props.horasTrabajoSemanal; }
   get academicHistory(): string[] { return [...this.props.academicHistory]; }
   get tiempoTrasladoMin(): number { return this.props.tiempoTrasladoMin; }
   get bufferSeguridadMin(): number { return this.props.bufferSeguridadMin; }
   get prohibitedTimeBlocks(): ProhibitedTimeBlock[] { 
     return [...this.props.prohibitedTimeBlocks]; 
   }
+  get passwordHash(): string | undefined { return this.props.passwordHash; }
+  get resetPasswordToken(): string | null | undefined { return this.props.resetPasswordToken; }
+  get resetPasswordExpires(): Date | null | undefined { return this.props.resetPasswordExpires; }
 
   /**
    * Verifica si el estudiante cumple los prerrequisitos de una materia.
